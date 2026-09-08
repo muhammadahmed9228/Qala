@@ -94,11 +94,11 @@ export default function AdminHeroPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-serif font-bold">Homepage Carousel</h1>
+        <h1 className="text-2xl font-serif font-bold text-qala-espresso">Homepage Carousel</h1>
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="bg-neutral-900 text-white px-4 py-2 rounded hover:bg-neutral-800 text-sm"
+            className="bg-qala-espresso px-4 py-2 text-sm text-white transition hover:bg-qala-bronze"
           >
             + Add Slide
           </button>
@@ -118,7 +118,7 @@ export default function AdminHeroPage() {
       )}
 
       {/* NEW: Sorting & Limit Controls */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200">
+      <div className="flex items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Show:</label>
           <select
@@ -169,7 +169,7 @@ export default function AdminHeroPage() {
             {slides.map((slide) => (
               <div
                 key={slide._id}
-                className="border border-neutral-200 rounded-lg overflow-hidden bg-white shadow-sm relative group"
+                className="group relative overflow-hidden rounded-lg border border-qala-champagne bg-white shadow-sm"
               >
                 <img
                   src={slide.image.url}
@@ -192,16 +192,16 @@ export default function AdminHeroPage() {
                 </div>
 
                 {/* Hover Actions */}
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute right-2 top-2 flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button
                     onClick={() => setSelectedSlide(slide)}
-                    className="bg-blue-600 text-white p-2 rounded-md shadow hover:bg-blue-700"
+                    className="rounded-md bg-qala-bronze p-2 text-white shadow transition hover:bg-qala-espresso"
                   >
                     👁️
                   </button>
                   <button
                     onClick={() => handleEdit(slide)}
-                    className="bg-white text-neutral-900 p-2 rounded-md shadow hover:bg-neutral-100"
+                    className="rounded-md border border-qala-champagne bg-qala-cream p-2 text-qala-espresso shadow hover:bg-qala-champagne"
                   >
                     Edit
                   </button>

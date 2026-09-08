@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 export default function HeroCarousel({ slides }) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const touchStartX = useRef(null);
 
   // Auto-advance slides every 5 seconds
   useEffect(() => {
@@ -13,29 +14,57 @@ export default function HeroCarousel({ slides }) {
     return () => clearInterval(interval);
   }, [slides.length]);
 
+  const showPreviousSlide = () => {
+    setCurrentIndex((index) => (index - 1 + slides.length) % slides.length);
+  };
+
+  const showNextSlide = () => {
+    setCurrentIndex((index) => (index + 1) % slides.length);
+  };
+
+  const handleTouchStart = (event) => {
+    touchStartX.current = event.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (event) => {
+    if (touchStartX.current === null || slides.length < 2) return;
+
+    const distance = event.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(distance) > 45) {
+      if (distance < 0) showNextSlide();
+      else showPreviousSlide();
+    }
+    touchStartX.current = null;
+  };
+
   if (!slides || slides.length === 0) return null;
 
   return (
-    <div className="relative w-full h-[52vh] md:h-[80vh] overflow-hidden bg-neutral-900 rounded-none md:rounded-lg">
+    <section
+      className="relative h-[68vh] min-h-[30rem] w-full overflow-hidden bg-qala-espresso touch-pan-y md:h-[78vh]"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {slides.map((slide, index) => (
         <div 
           key={slide._id}
           className={`absolute inset-0 transition-opacity duration-1000 ${index === currentIndex ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
           {/* Background Image with Dark Overlay */}
-          <div className="absolute inset-0 bg-black/30 z-10"></div>
-          <img src={slide.image.url} alt={slide.heading} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 z-10 bg-qala-espresso/35"></div>
+          <img src={slide.image.url} alt={slide.heading} className="h-full w-full object-cover transition-transform duration-[7000ms] ease-out" />
           
           {/* Text Content */}
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center text-white p-6">
-            <h2 className="text-3xl leading-tight md:text-6xl font-serif font-bold mb-4 tracking-wide">{slide.heading}</h2>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6 text-center text-white">
+            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.38em] text-qala-champagne">Qala / New season</p>
+            <h2 className="max-w-4xl text-4xl font-medium leading-[0.95] tracking-wide md:text-7xl">{slide.heading}</h2>
             {slide.subtitle && (
-              <p className="text-base leading-relaxed md:text-xl mb-8 max-w-2xl text-neutral-100">{slide.subtitle}</p>
+              <p className="mb-8 mt-5 max-w-xl text-sm leading-relaxed text-white/90 md:text-lg">{slide.subtitle}</p>
             )}
             {slide.buttonText && (
               <Link 
                 to={slide.buttonUrl} 
-                className="bg-white text-neutral-900 px-8 py-3 rounded-md font-semibold hover:bg-neutral-200 transition"
+                className="border border-white/70 px-8 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white transition hover:border-white hover:bg-white hover:text-qala-espresso"
               >
                 {slide.buttonText}
               </Link>
@@ -46,16 +75,17 @@ export default function HeroCarousel({ slides }) {
 
       {/* Manual Navigation Dots */}
       {slides.length > 1 && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex space-x-2">
+        <div className="absolute bottom-7 left-1/2 z-30 flex -translate-x-1/2 space-x-2">
           {slides.map((_, index) => (
             <button 
               key={index} 
               onClick={() => setCurrentIndex(index)}
-              className={`w-3 h-3 rounded-full transition-colors ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+              aria-label={`Go to slide ${index + 1}`}
+              className={`h-1.5 transition-all ${index === currentIndex ? "w-8 bg-white" : "w-3 bg-white/50"}`}
             />
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

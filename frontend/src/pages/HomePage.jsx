@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getPublicHeroSlidesApi } from "../features/homepage/api/homeApi"
 import { getPublicHomeSectionsApi } from "../features/admin/api/adminApi";
@@ -16,6 +16,8 @@ export default function HomePage() {
   const [collectionPosition, setCollectionPosition] = useState(0);
   const [visibleCollectionCount, setVisibleCollectionCount] = useState(3);
   const [loading, setLoading] = useState(true);
+  const collectionTouchStartX = useRef(null);
+  const sectionTouchStartX = useRef({});
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -101,6 +103,39 @@ export default function HomePage() {
     }, 300);
   };
 
+  const handleCollectionTouchStart = (event) => {
+    collectionTouchStartX.current = event.touches[0].clientX;
+  };
+
+  const handleCollectionTouchEnd = (event) => {
+    if (collectionTouchStartX.current === null || collections.length < 2) return;
+
+    const distance = event.changedTouches[0].clientX - collectionTouchStartX.current;
+    if (Math.abs(distance) > 45) {
+      if (distance < 0) {
+        setCollectionPosition((position) => Math.min(collectionMaxPosition, position + 1));
+      } else {
+        setCollectionPosition((position) => Math.max(0, position - 1));
+      }
+    }
+    collectionTouchStartX.current = null;
+  };
+
+  const handleSectionTouchStart = (sectionId, event) => {
+    sectionTouchStartX.current[sectionId] = event.touches[0].clientX;
+  };
+
+  const handleSectionTouchEnd = (sectionId, productsLength, event) => {
+    const startX = sectionTouchStartX.current[sectionId];
+    if (startX === undefined || productsLength <= 4) return;
+
+    const distance = event.changedTouches[0].clientX - startX;
+    if (Math.abs(distance) > 45) {
+      handleScroll(sectionId, distance < 0 ? "next" : "prev", productsLength);
+    }
+    delete sectionTouchStartX.current[sectionId];
+  };
+
   const collectionMaxPosition = Math.max(0, collections.length - visibleCollectionCount);
   const visibleCollections = collections.slice(
     collectionPosition,
@@ -108,21 +143,28 @@ export default function HomePage() {
   );
 
   const collectionSection = collections.length > 0 && (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 pt-2 md:pt-8">
-      <div className="mb-5 flex items-center justify-between gap-3 md:mb-8">
-        <h2 className="text-2xl font-serif font-bold md:text-3xl">Shop by Collection</h2>
+    <section className="mx-auto max-w-7xl px-1 pt-1 md:px-4 md:pt-6">
+      <div className="mb-4 flex items-end justify-between gap-3 md:mb-6">
+        <div>
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-qala-bronze">Explore the edit</p>
+          <h2 className="text-3xl font-medium text-qala-espresso md:text-4xl">Shop by Collection</h2>
+        </div>
       </div>
       <div className="relative">
-        <div className="flex gap-4 overflow-hidden md:gap-6">
+        <div
+          className="flex gap-4 overflow-hidden touch-pan-y md:gap-6"
+          onTouchStart={handleCollectionTouchStart}
+          onTouchEnd={handleCollectionTouchEnd}
+        >
         {visibleCollections.map(col => (
-          <div key={col._id} className="group relative h-64 min-w-[calc(50%-0.5rem)] overflow-hidden rounded-xl bg-neutral-900 shadow-md transition-transform duration-300 hover:-translate-y-1 md:h-80 md:min-w-[calc(33.333%-1rem)] md:flex-1">
+          <div key={col._id} className="group relative h-72 min-w-[calc(50%-0.5rem)] overflow-hidden bg-qala-espresso md:h-[26rem] md:min-w-[calc(33.333%-1rem)] md:flex-1">
             {col.image?.url && (
               <img src={col.image.url} alt={col.name} className="absolute inset-0 w-full h-full object-cover opacity-60 transition duration-700 group-hover:scale-105" />
             )}
             <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-transparent" />
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
-              <h3 className="text-2xl font-serif text-white font-bold mb-3 md:text-3xl md:mb-4">{col.name}</h3>
-              <Link to={`/collections/${col.slug}`} className="bg-white text-neutral-900 px-5 py-2 text-sm rounded-sm font-semibold transition hover:bg-neutral-200 md:px-6">
+              <h3 className="mb-4 text-3xl font-medium text-white md:text-4xl">{col.name}</h3>
+              <Link to={`/collections/${col.slug}`} className="border border-white/70 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-white hover:text-qala-espresso md:px-6">
                 See More
               </Link>
             </div>
@@ -134,7 +176,7 @@ export default function HomePage() {
           onClick={() => setCollectionPosition((position) => Math.max(0, position - 1))}
           disabled={collectionPosition === 0}
           aria-label="Previous collection"
-          className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-neutral-900 text-white shadow-lg transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-400"
+          className="absolute left-0 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center border border-qala-bronze bg-qala-cream text-qala-bronze transition hover:bg-qala-bronze hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="m15 18-6-6 6-6" />
@@ -145,22 +187,22 @@ export default function HomePage() {
           onClick={() => setCollectionPosition((position) => Math.min(collectionMaxPosition, position + 1))}
           disabled={collectionPosition >= collectionMaxPosition}
           aria-label="Next collection"
-          className="absolute right-0 top-1/2 z-10 flex h-10 w-10 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-neutral-900 text-white shadow-lg transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-400"
+          className="absolute right-0 top-1/2 z-10 flex h-10 w-10 translate-x-1/2 -translate-y-1/2 items-center justify-center border border-qala-bronze bg-qala-cream text-qala-bronze transition hover:bg-qala-bronze hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
           </svg>
         </button>
       </div>
-    </div>
+    </section>
   );
   const collectionInsertIndex = Math.ceil(dynamicSections.length / 2);
 
   if (loading) return <HomePageSkeleton />;
 
   return (
-    <div className="space-y-8 pb-16 md:space-y-10">
-      <div className="-mx-6 md:mx-0">
+    <div className="space-y-6 pb-12 md:space-y-10 md:pb-16">
+      <div>
         <HeroCarousel slides={slides} />
       </div>
 
@@ -176,22 +218,27 @@ export default function HomePage() {
 
         return (
         <Fragment key={section._id}>
-        <div key={section._id} className="max-w-7xl mx-auto px-4 py-6 md:px-8 md:py-8 rounded-2xl border border-neutral-200 bg-neutral-100/80 shadow-sm md:bg-gray-200 md:shadow-none md:border-0">
-          <div className="mb-6 flex flex-col items-start gap-3 md:mb-10 md:flex-row md:items-end md:justify-between">
+        <section key={section._id} className="mx-auto max-w-7xl border-t border-qala-champagne/70 px-2 py-5 md:px-4 md:py-8">
+          <div className="mb-4 flex flex-col items-start gap-3 md:mb-6 md:flex-row md:items-end md:justify-between">
             <div className="w-full text-left">
-              <h2 className="text-2xl font-serif font-bold mb-1 md:text-3xl">{section.title}</h2>
-              {section.subtitle && <p className="text-sm text-neutral-600 max-w-xl md:text-base">{section.subtitle}</p>}
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-qala-bronze">The Qala edit</p>
+              <h2 className="mb-1 text-3xl font-medium text-qala-espresso md:text-4xl">{section.title}</h2>
+              {section.subtitle && <p className="max-w-xl text-sm leading-relaxed text-neutral-600 md:text-base">{section.subtitle}</p>}
             </div>
             <Link
               to={viewMorePath}
-              className="inline-flex h-fit shrink-0 items-center justify-center self-end border-2 border-neutral-900 px-5 py-2 text-sm font-medium text-neutral-900 transition duration-200 hover:bg-neutral-900 hover:text-white md:self-auto md:px-8 md:text-base"
+              className="inline-flex h-fit shrink-0 items-center justify-center self-end border border-qala-espresso px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-qala-espresso transition duration-200 hover:bg-qala-espresso hover:text-white md:self-auto md:px-7"
             >
               View More
             </Link>
           </div>
           
-          <div className="relative group">
-            <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-6 transition-all duration-300 ease-in-out ${
+          <div
+            className="relative group touch-pan-y"
+            onTouchStart={(event) => handleSectionTouchStart(section._id, event)}
+            onTouchEnd={(event) => handleSectionTouchEnd(section._id, section.products.length, event)}
+          >
+            <div className={`grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-4 md:gap-7 transition-all duration-300 ease-in-out ${
               transitioningSections[section._id] ? 'opacity-0' : 'opacity-100'
             }`}>
               {visibleProducts.length > 0 ? (
@@ -218,8 +265,8 @@ export default function HomePage() {
                   disabled={!canScrollPrev}
                   className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-6 md:-translate-x-12 z-10 flex items-center justify-center w-12 h-12 md:w-14 md:h-14 rounded-full transition-all duration-300 ${
                     canScrollPrev
-                      ? 'bg-neutral-900 text-white hover:bg-neutral-800 hover:scale-110 hover:shadow-2xl hover:-translate-x-7 md:hover:-translate-x-14 cursor-pointer shadow-lg'
-                      : 'bg-neutral-300 text-neutral-400 cursor-not-allowed opacity-40'
+                      ? 'bg-qala-bronze text-white hover:bg-qala-espresso hover:scale-110 hover:shadow-lg hover:-translate-x-7 md:hover:-translate-x-14 cursor-pointer'
+                        : 'bg-qala-champagne/50 text-qala-bronze/50 cursor-not-allowed opacity-40'
                   }`}
                   aria-label="Previous products"
                 >
@@ -243,8 +290,8 @@ export default function HomePage() {
                   disabled={!canScrollNext}
                   className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-6 md:translate-x-12 z-10 flex items-center justify-center w-12 h-12 md:w-14 md:h-14 rounded-full transition-all duration-300 ${
                     canScrollNext
-                      ? 'bg-neutral-900 text-white hover:bg-neutral-800 hover:scale-110 hover:shadow-2xl hover:translate-x-7 md:hover:translate-x-14 cursor-pointer shadow-lg'
-                      : 'bg-neutral-300 text-neutral-400 cursor-not-allowed opacity-40'
+                      ? 'bg-qala-bronze text-white hover:bg-qala-espresso hover:scale-110 hover:shadow-lg hover:translate-x-7 md:hover:translate-x-14 cursor-pointer'
+                        : 'bg-qala-champagne/50 text-qala-bronze/50 cursor-not-allowed opacity-40'
                   }`}
                   aria-label="Next products"
                 >
@@ -264,7 +311,7 @@ export default function HomePage() {
               </>
             )}
           </div>
-        </div>
+        </section>
         {sectionIndex + 1 === collectionInsertIndex && collectionSection}
         </Fragment>
         );

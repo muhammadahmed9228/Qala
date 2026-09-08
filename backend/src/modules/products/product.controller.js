@@ -4,6 +4,8 @@ import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { Product } from "./product.model.js";
 
+const BRAND_SKU_ABBR = "Q";
+
 // Helper: Cleans text and extracts 3 uppercase characters
 const generateAbbreviation = (text, length = 3) => {
     if (!text) return "";
@@ -85,7 +87,7 @@ export const createProduct = asyncHandler(async (req, res) => {
 
     // NEW: Smart SKU Generation & Pre-database Image validation
     if (variants && Array.isArray(variants)) {
-        const brandAbbr = "NT"; // Nuzhat by Talha
+        const brandAbbr = BRAND_SKU_ABBR;
         let collectionAbbr = "GEN"; // Default fallback
         
         // Fetch collection name for abbreviation if it exists
@@ -126,10 +128,10 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const getAllProducts = asyncHandler(async (req, res) => {
-    const { search, collection, featured, published, stock, sort, page = 1, limit = 10 } = req.query;
+    const { search, collection, featured, published, stock, sort, dateRange, dateFrom, dateTo, page = 1, limit = 10 } = req.query;
     const isAdmin = req.user && req.user.role === "admin";
     
-    const baseQuery = isAdmin ? {} : { published: true };
+    const baseQuery = isAdmin ? { isDeleted: { $ne: true } } : { published: true, isDeleted: { $ne: true } };
 
     if (search) baseQuery.name = { $regex: search, $options: "i" };
     
@@ -142,6 +144,39 @@ export const getAllProducts = asyncHandler(async (req, res) => {
         if (stock === 'low') baseQuery.variants = { $elemMatch: { sizes: { $elemMatch: { stock: { $lt: 5, $gt: 0 } } } } };
     } else {
         if (featured === 'true') baseQuery.isFeatured = true;
+    }
+
+    const now = new Date();
+    let rangeStart;
+    let rangeEnd;
+    if (dateRange === "today") {
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else if (dateRange === "this_week") {
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+        rangeEnd = new Date(rangeStart);
+        rangeEnd.setDate(rangeStart.getDate() + 7);
+    } else if (dateRange === "this_month") {
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (dateRange === "this_year") {
+        rangeStart = new Date(now.getFullYear(), 0, 1);
+        rangeEnd = new Date(now.getFullYear() + 1, 0, 1);
+    } else if (dateRange === "custom") {
+        rangeStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+        rangeEnd = dateTo ? new Date(`${dateTo}T00:00:00`) : null;
+        if (rangeEnd) rangeEnd.setDate(rangeEnd.getDate() + 1);
+        if ((rangeStart && Number.isNaN(rangeStart.getTime())) || (rangeEnd && Number.isNaN(rangeEnd.getTime()))) {
+            throw new ApiError(400, "Invalid custom date range provided");
+        }
+        if (rangeStart && rangeEnd && rangeStart >= rangeEnd) {
+            throw new ApiError(400, "Custom start date must be before the end date");
+        }
+    }
+    if (rangeStart || rangeEnd) {
+        baseQuery.createdAt = {};
+        if (rangeStart) baseQuery.createdAt.$gte = rangeStart;
+        if (rangeEnd) baseQuery.createdAt.$lt = rangeEnd;
     }
 
     // NEW: Calculate product counts by collection using Aggregation
@@ -195,7 +230,7 @@ export const getProductById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     
     // We populate the collection details for the frontend
-    const product = await Product.findById(id).populate("collectionRef", "name slug");
+    const product = await Product.findOne({ _id: id, isDeleted: { $ne: true } }).populate("collectionRef", "name slug");
 
     if (!product) {
         throw new ApiError(404, "Product not found");
@@ -209,7 +244,7 @@ export const updateProductById = asyncHandler(async (req, res) => {
 
     // NEW: Smart SKU Generation & Pre-database Image validation
     if (variants && Array.isArray(variants)) {
-        const brandAbbr = "NT"; 
+        const brandAbbr = BRAND_SKU_ABBR;
         let collectionAbbr = "GEN"; 
         
         if (collectionRef) {
@@ -253,7 +288,61 @@ export const updateProductById = asyncHandler(async (req, res) => {
 });
 
 export const deleteProductById = asyncHandler(async (req, res) => {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findByIdAndUpdate(
+        req.params.id,
+        { $set: { isDeleted: true } },
+        { new: true }
+    );
     if (!product) throw new ApiError(404, "Product not found");
-    return res.status(200).json(new ApiResponse(200, {}, "Product deleted successfully"));
+    return res.status(200).json(new ApiResponse(200, {}, "Product moved to trash successfully"));
+});
+
+export const updateProductStock = asyncHandler(async (req, res) => {
+    const { variantId, sizeId, stock } = req.body;
+    const parsedStock = Number(stock);
+    if (!variantId || !sizeId || !Number.isInteger(parsedStock) || parsedStock < 0) {
+        throw new ApiError(400, "variantId, sizeId, and a non-negative integer stock value are required");
+    }
+
+    const product = await Product.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    if (!product) throw new ApiError(404, "Product not found");
+    const variant = product.variants.id(variantId);
+    const size = variant?.sizes.id(sizeId);
+    if (!size) throw new ApiError(404, "Product size variant not found");
+
+    size.stock = parsedStock;
+    await product.save();
+    return res.status(200).json(new ApiResponse(200, product, "Stock updated successfully"));
+});
+
+export const toggleProductFeatured = asyncHandler(async (req, res) => {
+    const product = await Product.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    if (!product) throw new ApiError(404, "Product not found");
+    product.isFeatured = !product.isFeatured;
+    await product.save();
+    return res.status(200).json(new ApiResponse(200, product, "Featured status updated successfully"));
+});
+
+export const toggleProductStatus = asyncHandler(async (req, res) => {
+    const product = await Product.findOne({ _id: req.params.id, isDeleted: { $ne: true } });
+    if (!product) throw new ApiError(404, "Product not found");
+    product.published = !product.published;
+    await product.save();
+    return res.status(200).json(new ApiResponse(200, product, "Publish status updated successfully"));
+});
+
+export const bulkUpdateProducts = asyncHandler(async (req, res) => {
+    const { ids, action } = req.body;
+    const validActions = ["publish", "draft", "delete"];
+    if (!Array.isArray(ids) || ids.length === 0 || !validActions.includes(action)) {
+        throw new ApiError(400, "ids and a valid bulk action are required");
+    }
+
+    const update = action === "publish"
+        ? { $set: { published: true } }
+        : action === "draft"
+            ? { $set: { published: false } }
+            : { $set: { isDeleted: true } };
+    await Product.updateMany({ _id: { $in: ids }, isDeleted: { $ne: true } }, update);
+    return res.status(200).json(new ApiResponse(200, {}, "Bulk product action completed successfully"));
 });

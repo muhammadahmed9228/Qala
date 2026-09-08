@@ -20,7 +20,7 @@ const sendEmail = async ({ to, subject, html }) => {
     try {
         const transporter = createTransporter();
         await transporter.sendMail({
-            from: `"Nuzhat by Talha" <${process.env.SMTP_USER}>`,
+            from: `"Qala" <${process.env.SMTP_USER}>`,
             to,
             subject,
             html,

@@ -11,29 +11,29 @@ export default function ProductCard({ product }) {
 
   return (
     <Link to={`/products/${product._id}`} className="group block">
-      <div className="relative aspect-[3/4] overflow-hidden bg-neutral-100 rounded-md mb-3">
+      <div className="relative mb-4 aspect-[3/4] overflow-hidden bg-qala-champagne/30">
         {/* Product Thumbnail */}
         {product.thumbnail?.url ? (
           <img
             src={product.thumbnail.url}
             alt={product.name}
-            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.04]"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-neutral-400">
+          <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-wider text-neutral-400">
             No Image
           </div>
         )}
 
         {product.discount > 0 && (
-          <div className="absolute top-2 left-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
+          <div className="absolute left-3 top-3 bg-qala-espresso px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white">
             -{product.discount}%
           </div>
         )}
 
         {/* NEW: Color Count Badge (Bottom Left) */}
         {variantCount > 1 && (
-          <span className="absolute bottom-2 left-2 bg-none backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1.5 rounded-md shadow flex items-center gap-1.5 z-10">
+          <span className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 bg-qala-espresso/75 px-2 py-1.5 text-[10px] font-semibold text-white backdrop-blur-sm">
             {/* Tiny color wheel indicator */}
             <span
               className="w-2.5 h-2.5 rounded-full shadow-inner"
@@ -47,11 +47,11 @@ export default function ProductCard({ product }) {
         )}
       </div>
 
-      <h3 className="text-sm font-medium text-neutral-900 truncate">
+      <h3 className="truncate text-sm font-medium text-qala-ink transition-colors group-hover:text-qala-bronze">
         {product.name}
       </h3>
-      <div className="flex items-center space-x-2 mt-1">
-        <span className="text-sm font-semibold">
+      <div className="mt-1 flex items-center space-x-2">
+        <span className="text-sm font-medium text-qala-bronze">
           Rs. {finalPrice.toLocaleString()}
         </span>
         {product.discount > 0 && (

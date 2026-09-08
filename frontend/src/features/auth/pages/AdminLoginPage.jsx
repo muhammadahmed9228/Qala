@@ -49,13 +49,13 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-100 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md bg-white border border-neutral-200 rounded-lg shadow-sm p-8">
+    <div className="flex min-h-screen items-center justify-center bg-qala-cream px-4 py-10">
+      <div className="w-full max-w-md border border-qala-champagne bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500 mb-3">
-            Nuzhat by Talha
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-qala-bronze">
+            Qala
           </p>
-          <h1 className="text-2xl font-serif font-bold">Admin Login</h1>
+          <h1 className="text-2xl font-serif font-bold text-qala-espresso">Admin Login</h1>
           <p className="text-sm text-neutral-500 mt-2">
             Sign in to access the admin panel.
           </p>
@@ -71,6 +71,7 @@ export default function AdminLoginPage() {
               type="email"
               name="email"
               required
+              placeholder="Enter your email address"
               autoComplete="email"
               value={formData.email}
               onChange={handleChange}
@@ -86,6 +87,7 @@ export default function AdminLoginPage() {
               type="password"
               name="password"
               required
+              placeholder="Enter password"
               autoComplete="current-password"
               value={formData.password}
               onChange={handleChange}

@@ -5,7 +5,11 @@ import {
     getProductById,
     updateProductById,
     deleteProductById,
-    checkSlugAvailability
+    checkSlugAvailability,
+    updateProductStock,
+    toggleProductFeatured,
+    toggleProductStatus,
+    bulkUpdateProducts
 } from "./product.controller.js";
 import { verifyJWT, authorizeAdmin, optionalAuth } from "../../middleware/auth.middleware.js";
 
@@ -19,6 +23,10 @@ router.route("/:id").get(getProductById);
 // Admin only routes
 router.use(verifyJWT, authorizeAdmin);
 router.route("/").post(createProduct);
+router.route("/bulk-action").post(bulkUpdateProducts);
+router.route("/:id/stock").patch(updateProductStock);
+router.route("/:id/toggle-featured").patch(toggleProductFeatured);
+router.route("/:id/toggle-status").patch(toggleProductStatus);
 router.route("/:id")
     .patch(verifyJWT, authorizeAdmin, updateProductById)
     .delete(verifyJWT, authorizeAdmin, deleteProductById);

@@ -22,6 +22,9 @@ export default function AdminOrdersPage() {
   const [totalPages, setTotalPages] = useState(1);
 const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState(""); // For debouncing the input
+  const [dateRange, setDateRange] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [statusCounts, setStatusCounts] = useState({}); // Stores the fetched counts
   // Added these new states right under your existing filter states:
   const [collection, setCollection] = useState(""); // Stores selected collection ID
@@ -37,7 +40,7 @@ const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchOrders();
-  }, [page, limit, sort, status, search, collection]);
+  }, [page, limit, sort, status, search, collection, dateRange, dateFrom, dateTo]);
 
  // Updated fetchOrders to pass search and capture counts:
   const fetchOrders = async () => {
@@ -46,6 +49,11 @@ const [search, setSearch] = useState("");
       const params = { page, limit, sort };
       if (status) params.status = status;
       if (search) params.search = search; // Pass search
+      if (dateRange) params.dateRange = dateRange;
+      if (dateRange === "custom") {
+        if (dateFrom) params.dateFrom = dateFrom;
+        if (dateTo) params.dateTo = dateTo;
+      }
 
       const response = await getAdminOrdersApi(params);
       setOrders(response.data.orders || response.data);
@@ -65,7 +73,7 @@ const [search, setSearch] = useState("");
     setPage(1);
   };
 
-  const hasActiveFilters = search !== "" || searchInput !== "" || limit !== 10 || sort !== "newest" || status !== "" || collection !== "";
+  const hasActiveFilters = search !== "" || searchInput !== "" || limit !== 10 || sort !== "newest" || status !== "" || collection !== "" || dateRange !== "" || dateFrom !== "" || dateTo !== "";
 
   const handleClearFilters = () => {
     setSearch("");
@@ -74,10 +82,18 @@ const [search, setSearch] = useState("");
     setSort("newest");
     setStatus("");
     setCollection("");
+    setDateRange("");
+    setDateFrom("");
+    setDateTo("");
     setPage(1);
   };
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus, currentStatus) => {
+    if (["Delivered", "Cancelled"].includes(currentStatus) && newStatus !== currentStatus) {
+      toast.error(`Cannot change a ${currentStatus.toLowerCase()} order status`);
+      return;
+    }
+
     try {
       await updateOrderStatusApi(orderId, newStatus);
       toast.success("Order status updated!");
@@ -114,7 +130,7 @@ const [search, setSearch] = useState("");
       {/* NEW: Quick Filter Pills with Counts */}
       {Object.keys(statusCounts).length > 0 && (
         <div className="flex flex-wrap gap-2 pb-2">
-          {["Total", "Pending", "Confirnmed", "Processing", "Shipped", "Delivered", "Cancelled"].map((stat) => (
+          {["Total", "Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"].map((stat) => (
             <button
               key={stat}
               onClick={() => { setStatus(stat === "Total" ? "" : stat); setPage(1); }}
@@ -155,6 +171,43 @@ const [search, setSearch] = useState("");
               <option value={10}>10</option>
               <option value={20}>20</option>
             </select>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-sm font-medium text-neutral-600" htmlFor="order-date-filter">Date Filter:</label>
+            <select
+              id="order-date-filter"
+              value={dateRange}
+              onChange={(e) => {
+                setDateRange(e.target.value);
+                setPage(1);
+              }}
+              className="border rounded px-2 py-1 text-sm outline-none"
+            >
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="this_week">This Week</option>
+              <option value="this_month">This Month</option>
+              <option value="this_year">This Year</option>
+              <option value="custom">Custom</option>
+            </select>
+            {dateRange === "custom" && (
+              <>
+                <input
+                  type="date"
+                  aria-label="Orders from date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                  className="border rounded px-2 py-1 text-sm outline-none"
+                />
+                <input
+                  type="date"
+                  aria-label="Orders to date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                  className="border rounded px-2 py-1 text-sm outline-none"
+                />
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-neutral-600">Sort by:</label>
@@ -227,10 +280,11 @@ const [search, setSearch] = useState("");
                     <td className="px-6 py-4">
                       <select
                         value={order.status}
+                        disabled={order.status === "Delivered" || order.status === "Cancelled"}
                         onChange={(e) =>
-                          handleStatusChange(order._id, e.target.value)
+                          handleStatusChange(order._id, e.target.value, order.status)
                         }
-                        className="border border-neutral-300 rounded px-2 py-1 text-sm bg-white focus:outline-none"
+                        className="border border-neutral-300 rounded px-2 py-1 text-sm bg-white focus:outline-none disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Confirmed">Confirmed</option>

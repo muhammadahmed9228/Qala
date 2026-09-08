@@ -179,7 +179,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     }
 
     // 3. Order Creation
-    const orderNumber = `NBT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    const orderNumber = `Q-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
     const order = await Order.create({
         orderNumber,
@@ -220,7 +220,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
 });
 
 export const getAllOrders = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, sort = "newest", status, search } = req.query;
+    const { page = 1, limit = 10, sort = "newest", status, search, dateRange, dateFrom, dateTo } = req.query;
 
     // Base query
     const baseQuery = req.user.role === "admin" ? {} : { customer: req.user._id };
@@ -232,6 +232,43 @@ export const getAllOrders = asyncHandler(async (req, res) => {
             { "customerInfo.name": { $regex: search, $options: "i" } },
             { "customerInfo.phone": { $regex: search, $options: "i" } }
         ];
+    }
+
+    const now = new Date();
+    let rangeStart;
+    let rangeEnd;
+
+    if (dateRange === "today") {
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        rangeEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else if (dateRange === "this_week") {
+        const day = now.getDay();
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+        rangeEnd = new Date(rangeStart);
+        rangeEnd.setDate(rangeStart.getDate() + 7);
+    } else if (dateRange === "this_month") {
+        rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (dateRange === "this_year") {
+        rangeStart = new Date(now.getFullYear(), 0, 1);
+        rangeEnd = new Date(now.getFullYear() + 1, 0, 1);
+    } else if (dateRange === "custom") {
+        rangeStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+        rangeEnd = dateTo ? new Date(`${dateTo}T00:00:00`) : null;
+        if (rangeEnd) rangeEnd.setDate(rangeEnd.getDate() + 1);
+
+        if ((rangeStart && Number.isNaN(rangeStart.getTime())) || (rangeEnd && Number.isNaN(rangeEnd.getTime()))) {
+            throw new ApiError(400, "Invalid custom date range provided");
+        }
+        if (rangeStart && rangeEnd && rangeStart >= rangeEnd) {
+            throw new ApiError(400, "Custom start date must be before the end date");
+        }
+    }
+
+    if (rangeStart || rangeEnd) {
+        baseQuery.createdAt = {};
+        if (rangeStart) baseQuery.createdAt.$gte = rangeStart;
+        if (rangeEnd) baseQuery.createdAt.$lt = rangeEnd;
     }
 
     // NEW: Calculate counts for each status using Aggregation
@@ -283,13 +320,16 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid status provided");
     }
 
-    const order = await Order.findByIdAndUpdate(
-        req.params.id,
-        { $set: { status } },
-        { new: true, runValidators: true }
-    );
+    const order = await Order.findById(req.params.id);
 
     if (!order) throw new ApiError(404, "Order not found");
+
+    if (["Delivered", "Cancelled"].includes(order.status) && order.status !== status) {
+        throw new ApiError(400, `Cannot change a ${order.status.toLowerCase()} order status`);
+    }
+
+    order.status = status;
+    await order.save();
 
 
     //PHASE 12: Trigger status email

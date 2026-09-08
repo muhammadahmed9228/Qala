@@ -44,6 +44,10 @@ export const updateHeroSlideApi = (id, data) => apiClient.patch(`/home/hero-slid
 //update, delete product (admin)
 export const updateProductApi = (id, productData) => apiClient.patch(`/products/${id}`, productData);
 export const deleteProductApi = (id) => apiClient.delete(`/products/${id}`);
+export const updateProductStockApi = (id, data) => apiClient.patch(`/products/${id}/stock`, data);
+export const toggleProductFeaturedApi = (id) => apiClient.patch(`/products/${id}/toggle-featured`);
+export const toggleProductStatusApi = (id) => apiClient.patch(`/products/${id}/toggle-status`);
+export const bulkUpdateProductsApi = (data) => apiClient.post("/products/bulk-action", data);
 
 // Collection APIs
 export const getAdminCollectionsApi = (params) => apiClient.get("/collections", { params });

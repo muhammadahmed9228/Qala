@@ -58,12 +58,12 @@ export default function SecondaryNavbar() {
   };
 
   return (
-    <div className="bg-neutral-50 border-b border-neutral-200 relative overflow-visible z-[70]">
+    <div className="relative z-[70] overflow-visible border-b border-qala-champagne/60 bg-qala-cream">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-12 flex items-center justify-between overflow-visible no-scrollbar">
         <div className="relative flex-shrink-0 z-[80]" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center cursor-pointer gap-2 text-sm font-bold text-neutral-800 hover:text-black py-2"
+            className="flex cursor-pointer items-center gap-2 py-2 text-xs font-semibold tracking-[0.16em] text-qala-espresso hover:text-qala-bronze"
           >
             SHOP BY COLLECTION
             <svg
@@ -114,7 +114,7 @@ export default function SecondaryNavbar() {
         <div className="flex items-center space-x-6 ml-6 flex-shrink-0">
           <button
             onClick={() => handleSortClick("createdAt")}
-            className="text-xs font-semibold cursor-pointer text-neutral-500 hover:text-black tracking-wider uppercase transition"
+            className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-500 transition hover:text-qala-bronze"
           >
             New Arrivals
           </button>

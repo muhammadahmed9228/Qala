@@ -92,15 +92,15 @@ export default function SearchBar({ isAdmin = false }) {
   return (
     <div ref={wrapperRef} className="relative flex-1 max-w-md w-full z-[120]">
       <form onSubmit={handleSubmit} className="flex w-full shadow-sm">
-        <input 
+        <input
           type="text" 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={isAdmin ? "Admin search (Products, Collections)..." : "Search products, collections..."}
-          className="w-full px-4 py-2 text-sm border border-neutral-300 rounded-l-md focus:outline-none focus:border-neutral-500"
+          className="w-full rounded-l-md border border-qala-champagne bg-white/70 px-4 py-2 text-sm text-qala-ink placeholder:text-neutral-400 focus:border-qala-bronze focus:outline-none"
           autoComplete="off"
         />
-        <button type="submit" className="bg-neutral-900 cursor-pointer text-white px-4 py-2 rounded-r-md text-sm hover:bg-neutral-800 transition">
+        <button type="submit" className="cursor-pointer rounded-r-md bg-qala-bronze px-4 py-2 text-sm text-white transition hover:bg-qala-espresso">
           Search
         </button>
       </form>

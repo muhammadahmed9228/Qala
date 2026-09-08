@@ -90,13 +90,13 @@ export default function AdminHomeSectionsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-serif font-bold">
+        <h1 className="text-2xl font-serif font-bold text-qala-espresso">
           Dynamic Homepage Sections
         </h1>
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="bg-neutral-900 text-white px-4 py-2 rounded hover:bg-neutral-800 text-sm"
+            className="bg-qala-espresso px-4 py-2 text-sm text-white transition hover:bg-qala-bronze"
           >
             + Add Section
           </button>
@@ -116,7 +116,7 @@ export default function AdminHomeSectionsPage() {
       )}
 
       {/* NEW: Sorting & Limit Controls */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200">
+      <div className="flex items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Show:</label>
           <select
@@ -167,7 +167,7 @@ export default function AdminHomeSectionsPage() {
             {sections.map((section) => (
               <div
                 key={section._id}
-                className="border border-neutral-200 rounded-lg p-5 bg-white shadow-sm relative group"
+                className="group relative rounded-lg border border-qala-champagne bg-white p-5 shadow-sm"
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-lg">{section.title}</h3>
@@ -181,7 +181,7 @@ export default function AdminHomeSectionsPage() {
                   {section.subtitle || "No subtitle"}
                 </p>
 
-                <div className="bg-neutral-50 p-3 rounded text-sm space-y-1 border border-neutral-100">
+                <div className="space-y-1 rounded border border-qala-champagne/70 bg-qala-champagne/20 p-3 text-sm">
                   <p>
                     <span className="font-semibold text-neutral-700">
                       Criteria:
@@ -205,10 +205,10 @@ export default function AdminHomeSectionsPage() {
                 </div>
 
                 {/* Hover Actions */}
-                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute right-2 top-2 flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button
                     onClick={() => handleEdit(section)}
-                    className="bg-white text-neutral-900 p-2 rounded-md shadow border hover:bg-neutral-100"
+                    className="rounded-md border border-qala-champagne bg-qala-cream p-2 text-qala-espresso shadow hover:bg-qala-champagne"
                   >
                     Edit
                   </button>

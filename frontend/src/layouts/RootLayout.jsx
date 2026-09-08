@@ -29,6 +29,7 @@ export default function RootLayout() {
 
   // Track the current URL route
   const location = useLocation();
+  const isHomePage = location.pathname === "/";
   const isCheckoutPage = location.pathname.includes("/checkout");
   const isAuthPage = ["/login", "/register"].includes(location.pathname);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -92,19 +93,19 @@ export default function RootLayout() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <header className={`hidden md:block sticky top-0 z-60 overflow-visible border-b border-neutral-200 bg-white/90 backdrop-blur-md transition-transform duration-300 ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"}`}>
+    <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
+      <header className={`${isCheckoutPage ? "hidden" : "hidden md:block"} sticky top-0 z-60 overflow-visible border-b border-qala-bronze/30 bg-qala-cream/95 backdrop-blur-md transition-transform duration-300 ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link
             to="/"
-            className="flex items-center gap-3 text-xl font-bold tracking-wider uppercase"
+            className="flex items-center gap-3 text-xl font-bold uppercase tracking-wider"
           >
             <img
               src={logoImg}
               alt="Qala Logo"
-              className="h-12 w-auto rounded-full object-contain"
+              className="h-12 w-auto object-contain"
             />
-            <span className="font-sans font-semibold tracking-widest text-gray-900 text-lg uppercase selection:bg-black selection:text-white">
+            <span className="text-lg font-semibold uppercase tracking-widest text-qala-espresso selection:bg-qala-bronze selection:text-white">
               Qala
             </span>
           </Link>
@@ -119,14 +120,14 @@ export default function RootLayout() {
             <button
               onClick={() => dispatch(toggleCart())}
               aria-label="Open cart"
-              className="relative flex h-10 w-10 items-center justify-center text-neutral-600 hover:text-neutral-900 cursor-pointer"
+              className="relative flex h-10 w-10 cursor-pointer items-center justify-center text-qala-espresso transition hover:text-qala-bronze"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2l1.4 11.2a2 2 0 0 0 2 1.8h7.8a2 2 0 0 0 2-1.6L20.5 8H5.4" />
                 <path strokeLinecap="round" d="M9 20h.01M17 20h.01" />
               </svg>
               {totalCartItems > 0 && (
-                <span className="absolute right-0 top-0 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold text-white">
+                <span className="absolute right-0 top-0 min-w-4 rounded-full bg-qala-bronze px-1 text-center text-[10px] font-bold text-white">
                   {totalCartItems}
                 </span>
               )}
@@ -134,24 +135,24 @@ export default function RootLayout() {
 
             {isAuthenticated ? (
               <>
-                <Link to="/profile" className="hover:text-amber-700">
+                <Link to="/profile" className="hover:text-qala-bronze">
                   Hi, {user?.name.split(" ")[0]}
                 </Link>
                 {user?.role === "admin" && (
-                  <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded font-semibold">
+                  <span className="rounded bg-qala-champagne px-2 py-0.5 text-xs font-semibold text-qala-espresso">
                     Admin
                   </span>
                 )}
                 <button
                   onClick={handleLogout}
-                  className="text-neutral-500 hover:text-neutral-900 cursor-pointer"
+                  className="cursor-pointer text-neutral-500 hover:text-qala-bronze"
                 >
                   Logout
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="hover:text-amber-700">
+                <Link to="/login" className="hover:text-qala-bronze">
                   Sign In
                 </Link>
               </>
@@ -163,7 +164,7 @@ export default function RootLayout() {
 
       {!isCheckoutPage && !isAuthPage && (
         <header
-          className={`md:hidden sticky top-0 z-60 border-b border-neutral-200 bg-white/95 backdrop-blur-md transition-transform duration-300 ${
+          className={`md:hidden sticky top-0 z-60 border-b border-qala-bronze/30 bg-qala-cream/95 backdrop-blur-md transition-transform duration-300 ${
             isHeaderVisible ? "translate-y-0" : "-translate-y-full"
           }`}
         >
@@ -175,7 +176,7 @@ export default function RootLayout() {
                 setIsMobileSearchOpen(false);
               }}
               aria-label="Open menu"
-              className="flex h-10 w-10 items-center justify-center text-neutral-700"
+              className="flex h-10 w-10 items-center justify-center text-qala-espresso"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
                 <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
@@ -194,7 +195,7 @@ export default function RootLayout() {
                   setIsMobileMenuOpen(false);
                 }}
                 aria-label="Search"
-                className="flex h-10 w-10 items-center justify-center text-neutral-700"
+                className="flex h-10 w-10 items-center justify-center text-qala-espresso"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
                   <circle cx="11" cy="11" r="6.5" />
@@ -205,25 +206,25 @@ export default function RootLayout() {
                 type="button"
                 onClick={() => dispatch(toggleCart())}
                 aria-label="Open cart"
-                className="relative flex h-10 w-10 items-center justify-center text-neutral-700"
+                className="relative flex h-10 w-10 items-center justify-center text-qala-espresso"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2l1.4 11.2a2 2 0 0 0 2 1.8h7.8a2 2 0 0 0 2-1.6L20.5 8H5.4" />
                   <path strokeLinecap="round" d="M9 20h.01M17 20h.01" />
                 </svg>
-                {totalCartItems > 0 && <span className="absolute right-0 top-0 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold text-white">{totalCartItems}</span>}
+                {totalCartItems > 0 && <span className="absolute right-0 top-0 min-w-4 rounded-full bg-qala-bronze px-1 text-center text-[10px] font-bold text-white">{totalCartItems}</span>}
               </button>
             </div>
           </div>
 
           {isMobileSearchOpen && (
-            <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-3">
+            <div className="border-t border-qala-champagne bg-qala-cream px-4 py-3">
               <SearchBar isAdmin={false} />
             </div>
           )}
 
           {isMobileMenuOpen && (
-            <div className="border-t border-neutral-200 bg-white px-5 py-4 shadow-lg">
+            <div className="border-t border-qala-champagne bg-qala-cream px-5 py-4 shadow-lg">
               <nav className="space-y-1 text-sm font-medium">
                 <p className="px-2 pb-2 text-xs font-bold uppercase tracking-wider text-neutral-400">Shop</p>
                 <Link to="/products" onClick={() => setIsMobileMenuOpen(false)} className="block border-b border-neutral-100 px-2 py-3">All Products</Link>
@@ -255,7 +256,7 @@ export default function RootLayout() {
         </header>
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+      <main className={`mx-auto w-full max-w-7xl flex-1 ${isHomePage ? "p-0 md:p-6" : "p-6"}`}>
         <Outlet />
       </main>
       {/* Footer */}

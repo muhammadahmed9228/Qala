@@ -108,6 +108,11 @@ const productSchema = new Schema(
             type: Boolean,
             default: false,
         },
+        isDeleted: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         thumbnail: {
             url: { type: String, required: true },
             fileId: { type: String, required: true },

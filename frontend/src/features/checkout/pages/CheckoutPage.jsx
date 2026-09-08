@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate, Navigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { clearCart } from "../../cart/cartSlice";
+import { toggleCart } from "../../cart/cartSlice";
 import { calculateItemPrice } from "../../cart/cartPricing";
 import { createOrderApi } from "../api/checkoutApi";
+import logoImg from "../../../assets/logo.jpeg";
 
 export default function CheckoutPage() {
   const { items } = useSelector((state) => state.cart);
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -85,7 +87,48 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8">
+    <div className="min-h-screen bg-qala-cream">
+      <header className="sticky top-0 z-40 border-b border-qala-champagne bg-qala-cream/95 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <Link to="/" aria-label="Qala home" className="flex items-center gap-2">
+            <img src={logoImg} alt="Qala Logo" className="h-10 w-auto object-contain" />
+            <span className="hidden text-sm font-semibold uppercase tracking-[0.2em] text-qala-espresso sm:inline">Qala</span>
+          </Link>
+
+          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-qala-espresso sm:gap-5">
+            {isAuthenticated ? (
+              <Link to="/profile" aria-label="Open profile" className="flex items-center gap-2 text-qala-bronze transition hover:text-qala-espresso">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-qala-bronze text-sm" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" className="h-4 w-4">
+                    <circle cx="12" cy="8" r="3.5" />
+                    <path strokeLinecap="round" d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
+                  </svg>
+                </span>
+                <span className="hidden sm:inline">Profile</span>
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 sm:gap-4">
+                <Link to="/login" className="transition hover:text-qala-bronze">Sign In</Link>
+                <Link to="/register" className="transition hover:text-qala-bronze">Register</Link>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => dispatch(toggleCart())}
+              aria-label="Open cart"
+              className="relative flex h-9 w-9 items-center justify-center text-qala-espresso transition hover:text-qala-bronze"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2l1.4 11.2a2 2 0 0 0 2 1.8h7.8a2 2 0 0 0 2-1.6L20.5 8H5.4" />
+                <path strokeLinecap="round" d="M9 20h.01M17 20h.01" />
+              </svg>
+              {items.length > 0 && <span className="absolute right-0 top-0 min-w-4 rounded-full bg-qala-bronze px-1 text-center text-[9px] font-bold text-white">{items.reduce((total, item) => total + item.quantity, 0)}</span>}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 md:py-8">
       <h2 className="text-3xl font-serif font-bold mb-8">Checkout</h2>
       
       <div className="flex flex-col lg:flex-row gap-10">
@@ -98,16 +141,16 @@ export default function CheckoutPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Full Name</label>
-                  <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                  <input type="text" name="name" placeholder="Enter full name" required value={formData.name} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">Email</label>
-                    <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                    <input type="email" placeholder="Enter email" name="email" required value={formData.email} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Phone Number</label>
-                    <input type="text" name="phone" required value={formData.phone} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                    <input type="text" placeholder="Enter phone no" name="phone" required value={formData.phone} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                   </div>
                 </div>
               </div>
@@ -115,20 +158,20 @@ export default function CheckoutPage() {
 
             {/* Shipping Information */}
             <div className="bg-white p-6 rounded-lg border border-neutral-200">
-              <h3 className="text-xl font-semibold mb-4 border-b pb-2">Shipping Address</h3>
+              <h3 className="text-xl font-semibold mb-4 border-b pb-2">Delivery/ Shipping Address</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Street Address</label>
-                  <input type="text" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                  <input type="text" placeholder="Enter your complete street adress" name="address" required value={formData.address} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">City</label>
-                    <input type="text" name="city" required value={formData.city} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                    <input type="text" placeholder="Enter city" name="city" required value={formData.city} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Postal Code</label>
-                    <input type="text" name="postalCode" required value={formData.postalCode} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
+                    <input type="text" placeholder="Enter your city postal code" name="postalCode" required value={formData.postalCode} onChange={handleChange} className="w-full px-3 py-2 border border-neutral-300 rounded-md" />
                   </div>
                 </div>
                 <div>
@@ -185,6 +228,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

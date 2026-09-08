@@ -4,7 +4,11 @@ import { toast } from "react-toastify";
 import { 
   getAdminProductsApi, 
   getAdminCollectionsApi, 
-  deleteProductApi 
+  deleteProductApi,
+  updateProductStockApi,
+  toggleProductFeaturedApi,
+  toggleProductStatusApi,
+  bulkUpdateProductsApi
 } from "../api/adminApi";
 import Modal from "../components/Modal";
 import Pagination from "../components/Pagination";
@@ -13,6 +17,7 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Pagination & Search State
   const [page, setPage] = useState(1);
@@ -20,6 +25,11 @@ export default function AdminProductsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [dateRange, setDateRange] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [inventorySelections, setInventorySelections] = useState({});
 
   // Filter States
   const [sort, setSort] = useState("createdAt");
@@ -42,7 +52,7 @@ export default function AdminProductsPage() {
   // Fetch Products when filters or pagination change
   useEffect(() => {
     fetchProducts();
-  }, [page, limit, sort, published, featured, stock, collection, search]);
+  }, [page, limit, sort, published, featured, stock, collection, search, dateRange, dateFrom, dateTo]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -53,6 +63,11 @@ export default function AdminProductsPage() {
       if (stock) params.stock = stock;
       if (collection) params.collection = collection;
       if (search) params.search = search;
+      if (dateRange) params.dateRange = dateRange;
+      if (dateRange === "custom") {
+        if (dateFrom) params.dateFrom = dateFrom;
+        if (dateTo) params.dateTo = dateTo;
+      }
 
       const response = await getAdminProductsApi(params);
       setProducts(response.data.products || response.data);
@@ -71,7 +86,7 @@ export default function AdminProductsPage() {
     setPage(1);
   };
 
-  const hasActiveFilters = search !== "" || searchInput !== "" || limit !== 10 || sort !== "createdAt" || published !== "" || featured !== "" || stock !== "" || collection !== "";
+  const hasActiveFilters = search !== "" || searchInput !== "" || limit !== 10 || sort !== "createdAt" || published !== "" || featured !== "" || stock !== "" || collection !== "" || dateRange !== "" || dateFrom !== "" || dateTo !== "";
 
   const handleClearFilters = () => {
     setSearch("");
@@ -82,17 +97,86 @@ export default function AdminProductsPage() {
     setFeatured("");
     setStock("");
     setCollection("");
+    setDateRange("");
+    setDateFrom("");
+    setDateTo("");
     setPage(1);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
+  const getInventorySlots = (product) => (product.variants || []).flatMap((variant) =>
+    (variant.sizes || []).map((size) => ({
+      variantId: variant._id,
+      sizeId: size._id,
+      label: `${variant.colorName} / ${size.size}`,
+      stock: size.stock || 0,
+    })),
+  );
+
+  const handleStockUpdate = async (product, slot) => {
     try {
-      await deleteProductApi(id);
-      toast.success("Product deleted successfully");
+      const response = await updateProductStockApi(product._id, slot);
+      const updatedProduct = response.data;
+      setProducts((current) => current.map((item) => item._id === product._id ? { ...item, variants: updatedProduct.variants } : item));
+      toast.success("Stock updated");
+    } catch (error) {
+      toast.error(error.message || "Failed to update stock");
+    }
+  };
+
+  const handleToggle = async (product, type) => {
+    try {
+      const response = type === "featured"
+        ? await toggleProductFeaturedApi(product._id)
+        : await toggleProductStatusApi(product._id);
+      const updatedProduct = response.data;
+      setProducts((current) => current.map((item) => item._id === product._id ? {
+        ...item,
+        published: updatedProduct.published,
+        isFeatured: updatedProduct.isFeatured,
+      } : item));
+    } catch (error) {
+      toast.error(error.message || "Failed to update product");
+    }
+  };
+
+  const toggleSelected = (id) => {
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const handleBulkAction = async (action) => {
+    if (selectedIds.length === 0) return;
+    if (action === "delete") {
+      setDeleteTarget({ type: "bulk", ids: selectedIds });
+      return;
+    }
+    try {
+      await bulkUpdateProductsApi({ ids: selectedIds, action });
+      toast.success("Bulk action completed");
+      setSelectedIds([]);
       fetchProducts();
     } catch (error) {
-      toast.error("Failed to delete product");
+      toast.error(error.message || "Failed to complete bulk action");
+    }
+  };
+
+  const handleDelete = (id) => {
+    setDeleteTarget({ type: "single", ids: [id] });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      if (deleteTarget.type === "bulk") {
+        await bulkUpdateProductsApi({ ids: deleteTarget.ids, action: "delete" });
+      } else {
+        await deleteProductApi(deleteTarget.ids[0]);
+      }
+      setDeleteTarget(null);
+      setSelectedIds([]);
+      toast.success("Product moved to trash");
+      fetchProducts();
+    } catch (error) {
+      toast.error(error.message || "Failed to delete product");
     }
   };
 
@@ -100,7 +184,7 @@ export default function AdminProductsPage() {
   const calculateTotalStock = (variants) => {
     if (!variants || variants.length === 0) return 0;
     return variants.reduce((total, v) => 
-      total + v.sizes.reduce((sTotal, s) => sTotal + (s.stock || 0), 0)
+      total + (v.sizes || []).reduce((sTotal, s) => sTotal + (s.stock || 0), 0)
     , 0);
   };
 
@@ -140,7 +224,7 @@ export default function AdminProductsPage() {
         </form>
 
         {/* Filters Grid */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-7">
           <div className="flex min-w-0 flex-col gap-1 sm:gap-2">
             <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">Show</label>
             <select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }} className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-300 sm:px-3 sm:py-2.5">
@@ -150,6 +234,23 @@ export default function AdminProductsPage() {
               <option value={50}>50</option>
             </select>
           </div>
+          <div className="flex min-w-0 flex-col gap-1 sm:gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-neutral-600">Date</label>
+            <select value={dateRange} onChange={(e) => { setDateRange(e.target.value); setPage(1); }} className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm outline-none focus:border-neutral-500 sm:px-3 sm:py-2.5">
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="this_week">This Week</option>
+              <option value="this_month">This Month</option>
+              <option value="this_year">This Year</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          {dateRange === "custom" && (
+            <>
+              <input type="date" aria-label="Products from date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm" />
+              <input type="date" aria-label="Products to date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-full rounded-md border border-neutral-300 bg-white px-2 py-2 text-sm" />
+            </>
+          )}
 
           <div className="flex min-w-0 flex-col gap-1 sm:gap-2">
             <label className="text-xs font-semibold text-neutral-600 uppercase tracking-wide">Collection</label>
@@ -212,10 +313,19 @@ export default function AdminProductsPage() {
         <div className="py-10 text-center">Loading products...</div>
       ) : (
         <>
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border border-qala-champagne bg-qala-champagne/20 p-3">
+              <span className="mr-2 text-sm font-semibold text-qala-espresso">{selectedIds.length} selected</span>
+              <button type="button" onClick={() => handleBulkAction("publish")} className="bg-qala-espresso px-3 py-2 text-xs font-semibold text-white hover:bg-qala-bronze">Mark Selected as Published</button>
+              <button type="button" onClick={() => handleBulkAction("draft")} className="border border-qala-espresso px-3 py-2 text-xs font-semibold text-qala-espresso hover:bg-qala-espresso hover:text-white">Mark Selected as Draft</button>
+              <button type="button" onClick={() => handleBulkAction("delete")} className="bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800">Bulk Delete</button>
+            </div>
+          )}
           <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-neutral-50 border-b border-neutral-200">
                 <tr>
+                  <th className="px-6 py-3 font-medium text-neutral-500"><input type="checkbox" aria-label="Select all products on page" checked={products.length > 0 && products.every((product) => selectedIds.includes(product._id))} onChange={(e) => setSelectedIds(e.target.checked ? products.map((product) => product._id) : [])} /></th>
                   <th className="px-6 py-3 font-medium text-neutral-500">Product</th>
                   <th className="px-6 py-3 font-medium text-neutral-500">Pricing</th>
                   <th className="px-6 py-3 font-medium text-neutral-500">Inventory</th>
@@ -227,6 +337,7 @@ export default function AdminProductsPage() {
                 {products.length > 0 ? (
                   products.map((product) => (
                     <tr key={product._id} className="hover:bg-neutral-50">
+                      <td className="px-6 py-4"><input type="checkbox" aria-label={`Select ${product.name}`} checked={selectedIds.includes(product._id)} onChange={() => toggleSelected(product._id)} /></td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           {product.thumbnail?.url ? (
@@ -247,16 +358,25 @@ export default function AdminProductsPage() {
                       <td className="px-6 py-4">
                         <p className="text-neutral-900">{product.variants?.length || 0} Colors</p>
                         <p className="text-xs text-neutral-500">Total Stock: {calculateTotalStock(product.variants)}</p>
+                        {(() => {
+                          const slots = getInventorySlots(product);
+                          const selected = inventorySelections[product._id] || slots[0];
+                          const totalStock = calculateTotalStock(product.variants);
+                          return (
+                            <div className="mt-2 space-y-1">
+                              <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold ${totalStock === 0 ? "bg-red-100 text-red-800" : totalStock <= 3 ? "bg-amber-100 text-amber-800" : "bg-qala-champagne text-qala-espresso"}`}>{totalStock === 0 ? "Out of Stock" : totalStock <= 3 ? "Low Stock" : "In Stock"}</span>
+                              {selected && <div className="flex items-center gap-1"><select value={`${selected.variantId}:${selected.sizeId}`} onChange={(e) => { const next = slots.find((slot) => `${slot.variantId}:${slot.sizeId}` === e.target.value); setInventorySelections((current) => ({ ...current, [product._id]: next })); }} className="max-w-[120px] border border-neutral-300 px-1 py-1 text-[10px]"><option value={`${selected.variantId}:${selected.sizeId}`}>{selected.label}</option>{slots.filter((slot) => `${slot.variantId}:${slot.sizeId}` !== `${selected.variantId}:${selected.sizeId}`).map((slot) => <option key={`${slot.variantId}:${slot.sizeId}`} value={`${slot.variantId}:${slot.sizeId}`}>{slot.label}</option>)}</select><input type="number" min="0" value={selected.stock} onChange={(e) => setInventorySelections((current) => ({ ...current, [product._id]: { ...selected, stock: Number(e.target.value) } }))} className="w-14 border border-neutral-300 px-1 py-1 text-[10px]" aria-label="Stock quantity" /><button type="button" onClick={() => handleStockUpdate(product, selected)} className="bg-qala-bronze px-1.5 py-1 text-[10px] text-white hover:bg-qala-espresso">Save</button></div>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 space-y-1 flex flex-col items-start">
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${product.published ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                        <button type="button" onClick={() => handleToggle(product, "status")} className={`px-2 py-0.5 rounded text-xs font-semibold ${product.published ? 'bg-green-100 text-green-800' : 'bg-neutral-200 text-neutral-700'}`}>
                           {product.published ? "Published" : "Draft"}
-                        </span>
-                        {product.isFeatured && (
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">
-                            Featured
-                          </span>
-                        )}
+                        </button>
+                        <button type="button" onClick={() => handleToggle(product, "featured")} className={`px-2 py-0.5 rounded text-xs font-semibold ${product.isFeatured ? "bg-amber-100 text-amber-800" : "bg-neutral-100 text-neutral-600"}`}>
+                          {product.isFeatured ? "Featured" : "Not Featured"}
+                        </button>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button onClick={() => setSelectedProduct(product)} className="text-blue-600 hover:underline mr-3 text-sm">View</button>
@@ -267,7 +387,7 @@ export default function AdminProductsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-neutral-500">
+                    <td colSpan="6" className="px-6 py-8 text-center text-neutral-500">
                       No products found matching your criteria.
                     </td>
                   </tr>
@@ -345,6 +465,16 @@ export default function AdminProductsPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Confirm Product Deletion">
+        <div className="space-y-5">
+          <p className="text-sm text-neutral-600">This will move the selected product{deleteTarget?.ids.length === 1 ? "" : "s"} to trash. They will no longer appear in the storefront.</p>
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => setDeleteTarget(null)} className="border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">Keep Product</button>
+            <button type="button" onClick={confirmDelete} className="bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Move to Trash</button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

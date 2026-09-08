@@ -4,7 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ipKeyGenerator } from "express-rate-limit";
 
 const GLOBAL_LIMIT = 100;
-const ADMIN_LIMIT = 2000;
+const ADMIN_LIMIT = 4000; //was 2000
 const WINDOW_MS = 15 * 60 * 1000;
 
 const getVerifiedAccessToken = (req) => {

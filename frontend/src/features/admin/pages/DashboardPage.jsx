@@ -1,120 +1,3 @@
-// import { useState, useEffect } from "react";
-// import { toast } from "react-toastify";
-// import { getDashboardStatsApi } from "../api/adminApi";
-// import Pagination from "../components/Pagination";
-// import Modal from "../components/Modal";
-
-// export default function DashboardPage() {
-//   const [data, setData] = useState(null);
-//   const [loading, setLoading] = useState(true);
-
-//   useEffect(() => {
-//     const fetchStats = async () => {
-//       try {
-//         const response = await getDashboardStatsApi();
-//         setData(response.data);
-//       } catch (error) {
-//         toast.error("Failed to load dashboard statistics");
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-//     fetchStats();
-//   }, []);
-
-//   if (loading) return <div className="py-20 text-center">Loading dashboard...</div>;
-//   if (!data) return <div className="py-20 text-center text-red-500">Failed to load data.</div>;
-
-//   const { stats, recentOrders } = data;
-
-//   const StatCard = ({ title, value, subtitle }) => (
-//     <div className="bg-white p-6 rounded-lg shadow-sm border border-neutral-200">
-//       <h3 className="text-sm font-medium text-neutral-500 mb-1">{title}</h3>
-//       <p className="text-3xl font-bold text-neutral-900">{value}</p>
-//       {subtitle && <p className="text-xs text-neutral-400 mt-2">{subtitle}</p>}
-//     </div>
-//   );
-
-//   return (
-//     <div className="space-y-8">
-//       <h1 className="text-3xl font-serif font-bold">Dashboard Overview</h1>
-
-//       {/* Top Stats Row */}
-//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-//         <StatCard 
-//           title="Total Revenue" 
-//           value={`Rs. ${stats.revenue.toLocaleString()}`} 
-//           subtitle="From delivered orders" 
-//         />
-//         <StatCard 
-//           title="Total Orders" 
-//           value={stats.orders.total} 
-//           subtitle={`${stats.orders.pending} pending, ${stats.orders.processing} processing`} 
-//         />
-//         <StatCard 
-//           title="Total Customers" 
-//           value={stats.customers} 
-//         />
-//         <StatCard 
-//           title="Total Products" 
-//           value={stats.products} 
-//         />
-//       </div>
-
-//       {/* Recent Orders Table */}
-//       <div className="bg-white rounded-lg shadow-sm border border-neutral-200 overflow-hidden">
-//         <div className="px-6 py-4 border-b border-neutral-200 flex justify-between items-center">
-//           <h2 className="text-lg font-semibold">Recent Orders</h2>
-//         </div>
-//         <div className="overflow-x-auto">
-//           <table className="w-full text-left text-sm">
-//             <thead className="bg-neutral-50 border-b border-neutral-200">
-//               <tr>
-//                 <th className="px-6 py-3 font-medium text-neutral-500">Order No.</th>
-//                 <th className="px-6 py-3 font-medium text-neutral-500">Customer</th>
-//                 <th className="px-6 py-3 font-medium text-neutral-500">Date</th>
-//                 <th className="px-6 py-3 font-medium text-neutral-500">Total</th>
-//                 <th className="px-6 py-3 font-medium text-neutral-500">Status</th>
-//               </tr>
-//             </thead>
-//             <tbody className="divide-y divide-neutral-200">
-//               {recentOrders.length > 0 ? (
-//                 recentOrders.map((order) => (
-//                   <tr key={order._id} className="hover:bg-neutral-50 transition">
-//                     <td className="px-6 py-4 font-medium">{order.orderNumber}</td>
-//                     <td className="px-6 py-4">{order.customerInfo.name}</td>
-//                     <td className="px-6 py-4 text-neutral-500">
-//                       {new Date(order.createdAt).toLocaleDateString()}
-//                     </td>
-//                     <td className="px-6 py-4 font-semibold">
-//                       Rs. {order.pricing.total.toLocaleString()}
-//                     </td>
-//                     <td className="px-6 py-4">
-//                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold
-//                         ${order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-//                           order.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-//                           'bg-amber-100 text-amber-800'}`}
-//                       >
-//                         {order.status}
-//                       </span>
-//                     </td>
-//                   </tr>
-//                 ))
-//               ) : (
-//                 <tr>
-//                   <td colSpan="5" className="px-6 py-8 text-center text-neutral-500">
-//                     No recent orders found.
-//                   </td>
-//                 </tr>
-//               )}
-//             </tbody>
-//           </table>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getDashboardStatsApi, getAdminOrdersApi, updateOrderStatusApi, deleteOrderApi } from "../api/adminApi";
@@ -171,7 +54,12 @@ export default function DashboardPage() {
     }
   };
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus, currentStatus) => {
+    if (["Delivered", "Cancelled"].includes(currentStatus) && newStatus !== currentStatus) {
+      toast.error(`Cannot change a ${currentStatus.toLowerCase()} order status`);
+      return;
+    }
+
     try {
       await updateOrderStatusApi(orderId, newStatus);
       toast.success("Order status updated!");
@@ -303,8 +191,9 @@ export default function DashboardPage() {
                         <td className="px-6 py-4 flex flex-col gap-2 items-start">
                           <select
                             value={order.status}
-                            onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                            className="border border-neutral-300 rounded px-2 py-1 text-sm bg-white focus:outline-none"
+                            disabled={order.status === "Delivered" || order.status === "Cancelled"}
+                            onChange={(e) => handleStatusChange(order._id, e.target.value, order.status)}
+                            className="border border-neutral-300 rounded px-2 py-1 text-sm bg-white focus:outline-none disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-500"
                           >
                             <option value="Pending">Pending</option>
                             <option value="Confirmed">Confirmed</option>
