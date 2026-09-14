@@ -20,10 +20,28 @@ app.get("/health", (req, res) => {
 
 // Middleware
 app.use(helmet());
+// Parse environment origins and trim any accidental whitespaces
+const allowedOrigins = process.env.CORS_ORIGIN 
+  ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) 
+  : [];
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: function (origin, callback) {
+        // 1. Allow non-browser requests (like Postman) ONLY in development environment
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        
+        // 2. Check if the incoming origin is authorized
+        if (!origin && isDevelopment) {
+            callback(null, true);
+        } else if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
+
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
