@@ -1,17 +1,17 @@
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-// import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
+import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
 import { useState } from "react";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
 // import { validateCouponApi } from "../../checkout/api/checkoutApi";
 
 export default function CartPage() {
   const { items, coupon } = useSelector((state) => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [couponInput, setCouponInput] = useState("");
-  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  // const [couponInput, setCouponInput] = useState("");
+  // const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const subtotal = items.reduce(
     (total, item) =>
