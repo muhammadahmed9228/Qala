@@ -1,10 +1,10 @@
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
+// import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { validateCouponApi } from "../../checkout/api/checkoutApi";
+// import { validateCouponApi } from "../../checkout/api/checkoutApi";
 
 export default function CartPage() {
   const { items, coupon } = useSelector((state) => state.cart);
@@ -17,7 +17,7 @@ export default function CartPage() {
     (total, item) =>
       total +
       (item.price ?? item.unitPrice ?? calculateItemPrice(item)) *
-        item.quantity,
+      item.quantity,
     0,
   );
 
@@ -31,21 +31,21 @@ export default function CartPage() {
   }
   const estimatedTotal = Math.max(0, subtotal - discount);
 
-  const handleApplyCoupon = async (e) => {
-    e.preventDefault();
-    if (!couponInput.trim()) return;
-    setIsValidatingCoupon(true);
-    try {
-      const res = await validateCouponApi(couponInput, subtotal);
-      dispatch(applyCoupon(res.data.coupon));
-      setCouponInput("");
-      toast.success("Coupon applied successfully!");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Invalid coupon code");
-    } finally {
-      setIsValidatingCoupon(false);
-    }
-  };
+  // const handleApplyCoupon = async (e) => {
+  //   e.preventDefault();
+  //   if (!couponInput.trim()) return;
+  //   setIsValidatingCoupon(true);
+  //   try {
+  //     const res = await validateCouponApi(couponInput, subtotal);
+  //     dispatch(applyCoupon(res.data.coupon));
+  //     setCouponInput("");
+  //     toast.success("Coupon applied successfully!");
+  //   } catch (error) {
+  //     toast.error(error.response?.data?.message || "Invalid coupon code");
+  //   } finally {
+  //     setIsValidatingCoupon(false);
+  //   }
+  // };
 
   if (items.length === 0) {
     return (
@@ -185,7 +185,7 @@ export default function CartPage() {
             <div className="flex justify-between text-green-600 font-medium">
               <div className="flex items-center gap-2">
                 <span>Discount ({coupon.code})</span>
-                <button 
+                <button
                   onClick={() => dispatch(removeCoupon())}
                   className="text-xs text-red-500 hover:underline"
                 >
@@ -206,7 +206,7 @@ export default function CartPage() {
           </div>
 
           {/* Coupon Input Form */}
-          <form onSubmit={handleApplyCoupon} className="mt-4 flex gap-2">
+          {/* <form onSubmit={handleApplyCoupon} className="mt-4 flex gap-2">
             <input
               type="text"
               placeholder="Coupon Code"
@@ -221,7 +221,7 @@ export default function CartPage() {
             >
               {isValidatingCoupon ? "Applying..." : "Apply"}
             </button>
-          </form>
+          </form> */}
 
           <button
             onClick={() => navigate("/checkout")}
