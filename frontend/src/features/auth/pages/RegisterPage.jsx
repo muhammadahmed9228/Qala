@@ -2,10 +2,13 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { registerApi } from "../api/authApi";
+import { Turnstile } from '@marsidev/react-turnstile';
+import PasswordInput from "../../../components/PasswordInput";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ name: "", email: "", password: "", phone: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -14,9 +17,15 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+    
     setSubmitting(true);
     try {
-      await registerApi(formData);
+      await registerApi({ ...formData, turnstileToken });
       toast.success("Account created successfully! Please log in.");
       navigate("/login");
     } catch (error) {
@@ -64,15 +73,24 @@ export default function RegisterPage() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
+          <PasswordInput
             name="password"
             required
+            placeholder="Enter password"
+            autoComplete="new-password"
             value={formData.password}
             onChange={handleChange}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-black"
           />
         </div>
+        
+        <div className="py-2 flex justify-center">
+          <Turnstile 
+            siteKey="0x4AAAAAAEyCT9dIF1IcOxCK" 
+            onSuccess={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken(null)}
+          />
+        </div>
+
         <button
           type="submit"
           disabled={submitting}

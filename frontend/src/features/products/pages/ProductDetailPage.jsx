@@ -2,18 +2,20 @@ import { useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { getProductByIdApi } from "../api/productsApi";
+import { getProductByIdApi, getProductsApi } from "../api/productsApi";
 import { useDispatch } from "react-redux";
 import { addToCart, closeCart } from "../../cart/cartSlice";
+import ProductCard from "../components/ProductCard";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const dispatch = useDispatch();
-  
+
   // Variant Selection State
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedSize, setSelectedSize] = useState(null);
@@ -24,6 +26,7 @@ export default function ProductDetailPage() {
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [imageViewerScale, setImageViewerScale] = useState(1);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isDisclaimerExpanded, setIsDisclaimerExpanded] = useState(false);
   const touchStartX = useRef(null);
 
   // --- NEW: Custom Sizing States ---
@@ -62,6 +65,24 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
+  useEffect(() => {
+    const fetchRelatedProducts = async () => {
+      if (!product?._id) return;
+      try {
+        const params = { limit: 12 };
+        if (product.collection?._id || product.collection) {
+          params.collection = product.collection._id || product.collection;
+        }
+        const response = await getProductsApi(params);
+        const list = response.data?.products || response.data || [];
+        setRelatedProducts(list.filter((p) => p._id !== product._id));
+      } catch {
+        // non-blocking
+      }
+    };
+    fetchRelatedProducts();
+  }, [product]);
+
   const handleVariantChange = (variant) => {
     setSelectedVariant(variant);
     if (variant.sizes && variant.sizes.length > 0) {
@@ -69,10 +90,10 @@ export default function ProductDetailPage() {
     } else {
       setSelectedSize(null);
     }
-    
+
     // Reset custom sizing when changing color
     setIsCustomSizeSelected(false);
-    
+
     if (variant.images && variant.images.length > 0) {
       setActiveImage(variant.images[0].url);
     }
@@ -91,7 +112,7 @@ export default function ProductDetailPage() {
     if (isCustomSizeSelected) {
       const requiredFields = product.customSizing?.requiredMeasurements || [];
       const missingFields = requiredFields.filter(field => !customMeasurements[field]);
-      
+
       if (missingFields.length > 0) {
         toast.error(`Please provide measurements for: ${missingFields.join(', ')}`);
         return;
@@ -114,8 +135,8 @@ export default function ProductDetailPage() {
       variantId: selectedVariant._id,
       color: selectedVariant.colorName,
       // If custom, pass "CUSTOM", else pass the selected standard size
-      size: isCustomSizeSelected ? "CUSTOM" : selectedSize.size, 
-      sku: isCustomSizeSelected ? `CUSTOM-${selectedVariant.colorName.substring(0,3).toUpperCase()}` : selectedSize.sku,
+      size: isCustomSizeSelected ? "CUSTOM" : selectedSize.size,
+      sku: isCustomSizeSelected ? `CUSTOM-${selectedVariant.colorName.substring(0, 3).toUpperCase()}` : selectedSize.sku,
       stock: isCustomSizeSelected ? null : selectedSize.stock,
       quantity: quantity,
       basePrice: product.basePrice,
@@ -125,7 +146,7 @@ export default function ProductDetailPage() {
       price: finalPrice,
       unitPrice: finalPrice,
       // NEW: Pass the measurements to Redux
-      customMeasurements: isCustomSizeSelected ? customMeasurements : null 
+      customMeasurements: isCustomSizeSelected ? customMeasurements : null
     };
 
     dispatch(addToCart(cartPayload));
@@ -149,7 +170,7 @@ export default function ProductDetailPage() {
     : currentBasePrice;
 
   // --- NEW: WhatsApp URL Generation ---
-  const whatsappNumber = "923235897014"; 
+  const whatsappNumber = "923235897014";
   const currentUrl = window.location.href;
   const currentSku = isCustomSizeSelected ? "CUSTOM" : (selectedSize?.sku || "N/A");
   const whatsappMessage = `Hello Qala! I have a question about ${product.name} (SKU: ${currentSku}). ${currentUrl}`;
@@ -197,7 +218,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-2 py-5 sm:px-6 md:py-8">
-      
+
       {/* NEW: Size Chart Modal */}
       {showSizeChart && product.sizeChartImage?.url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
@@ -206,7 +227,7 @@ export default function ProductDetailPage() {
               type="button"
               onClick={() => setShowSizeChart(false)}
               aria-label="Close size chart"
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-qala-espresso text-xl leading-none text-white shadow-md transition hover:bg-qala-bronze"
+              className="absolute right-3 top-3 z-10 flex items-center justify-center text-4xl text-black drop-shadow-[0_0_8px_rgba(255,255,255,1)] hover:scale-110 transition-transform bg-transparent border-none"
             >
               &times;
             </button>
@@ -275,7 +296,7 @@ export default function ProductDetailPage() {
       </nav>
 
       <div className="flex flex-col gap-10 md:flex-row">
-        
+
         {/* Image Gallery */}
         <div className="w-full md:w-1/2">
           <div className="relative aspect-3/4 mb-4">
@@ -302,9 +323,9 @@ export default function ProductDetailPage() {
                     type="button"
                     onClick={showPreviousImage}
                     aria-label="Previous product image"
-                    className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-qala-bronze bg-qala-cream/90 text-qala-espresso shadow-md transition hover:bg-qala-bronze hover:text-white"
+                    className="absolute left-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] transition hover:scale-110 bg-transparent border-none"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="m15 18-6-6 6-6" />
                     </svg>
                   </button>
@@ -312,9 +333,9 @@ export default function ProductDetailPage() {
                     type="button"
                     onClick={showNextImage}
                     aria-label="Next product image"
-                    className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-qala-bronze bg-qala-cream/90 text-qala-espresso shadow-md transition hover:bg-qala-bronze hover:text-white"
+                    className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] transition hover:scale-110 bg-transparent border-none"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
                     </svg>
                   </button>
@@ -347,7 +368,7 @@ export default function ProductDetailPage() {
 
         {/* Product Details */}
         <div className="w-full md:w-1/2 space-y-6">
-          
+
           <div>
             <h1 className="mb-2 text-3xl font-medium text-qala-espresso">{product.name}</h1>
             <div className="flex items-center space-x-3 text-xl">
@@ -460,8 +481,8 @@ export default function ProductDetailPage() {
                   {product.customSizing.requiredMeasurements.map(field => (
                     <div key={field}>
                       <label className="mb-1 block text-xs font-medium text-qala-espresso">{field} *</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         required
                         placeholder="e.g. 36"
                         value={customMeasurements[field] || ""}
@@ -470,6 +491,11 @@ export default function ProductDetailPage() {
                       />
                     </div>
                   ))}
+                </div>
+                <div className="mt-3 bg-red-50 border-l-4 border-red-500 p-3">
+                  <p className="text-xs font-bold text-red-700 uppercase tracking-wide">
+                    Custom orders can't be exchanged or returned.
+                  </p>
                 </div>
               </div>
             )}
@@ -513,21 +539,56 @@ export default function ProductDetailPage() {
 
           {/* NEW: WhatsApp Inquiry Button */}
           <div className="pt-2">
-            <a 
+            <a
               href={whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex w-full items-center justify-center gap-2 border border-qala-bronze px-4 py-2.5 text-sm font-semibold text-qala-bronze transition-colors hover:bg-qala-bronze hover:text-white md:w-auto md:min-w-56"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.878-.788-1.472-1.761-1.645-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.878-.788-1.472-1.761-1.645-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
               </svg>
               Ask about this piece on WhatsApp
             </a>
           </div>
 
+          {/* NEW: Disclaimer */}
+          <div className="mt-6 border-t border-qala-champagne pt-4">
+            <button
+              onClick={() => setIsDisclaimerExpanded(!isDisclaimerExpanded)}
+              className="flex w-full items-center justify-between py-2 text-sm font-semibold text-qala-espresso hover:text-qala-bronze"
+            >
+              <span>Disclaimer</span>
+              <span className="text-lg leading-none">{isDisclaimerExpanded ? "−" : "+"}</span>
+            </button>
+            {isDisclaimerExpanded && (
+              <p className="mt-2 text-xs leading-relaxed text-neutral-600 animate-fade-in">
+                Disclaimer: Product color may vary slightly due to photographic lighting sources or monitor settings.
+              </p>
+            )}
+          </div>
+
         </div>
       </div>
+
+      {/* Related Products Carousel */}
+      {relatedProducts.length > 0 && (
+        <section className="mt-16 border-t border-qala-champagne/70 pt-10">
+          <div className="mb-6">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-qala-bronze">
+              Curated for you
+            </p>
+            <h2 className="text-3xl font-medium text-qala-espresso md:text-4xl">
+              You May Also Like
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-8">
+            {relatedProducts.slice(0, 4).map((relatedProduct) => (
+              <ProductCard key={relatedProduct._id} product={relatedProduct} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

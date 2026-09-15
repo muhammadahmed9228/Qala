@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { getProductsApi, getPublicCollectionsApi } from "../features/products/api/productsApi";
 import { getAdminProductsApi, getAdminCollectionsApi } from "../features/admin/api/adminApi";
 
-export default function SearchBar({ isAdmin = false }) {
+export default function SearchBar({ isAdmin = false, onClose }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState({ products: [], collections: [] });
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Close the dropdown if the user clicks anywhere outside of it
   useEffect(() => {
@@ -65,9 +66,19 @@ export default function SearchBar({ isAdmin = false }) {
     return () => clearTimeout(timer);
   }, [query, isAdmin]);
 
+  const handleClearQuery = () => {
+    setQuery("");
+    setResults({ products: [], collections: [] });
+    setIsOpen(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const handleProductClick = (id) => {
     setIsOpen(false);
     setQuery("");
+    if (onClose) onClose();
     if (isAdmin) navigate(`/admin/products/${id}/edit`);
     else navigate(`/products/${id}`);
   };
@@ -75,6 +86,7 @@ export default function SearchBar({ isAdmin = false }) {
   const handleCollectionClick = (slug) => {
     setIsOpen(false);
     setQuery("");
+    if (onClose) onClose();
     if (isAdmin) navigate(`/admin/collections`); // Admins manage all collections centrally
     else navigate(`/collections/${slug}`);
   };
@@ -83,6 +95,7 @@ export default function SearchBar({ isAdmin = false }) {
     e.preventDefault();
     if (query.trim()) {
       setIsOpen(false);
+      if (onClose) onClose();
       if (isAdmin) navigate(`/admin/products?search=${encodeURIComponent(query)}`);
       else navigate(`/products?search=${encodeURIComponent(query)}`);
       setQuery("");
@@ -91,18 +104,73 @@ export default function SearchBar({ isAdmin = false }) {
 
   return (
     <div ref={wrapperRef} className="relative flex-1 max-w-md w-full z-[120]">
-      <form onSubmit={handleSubmit} className="flex w-full shadow-sm">
-        <input
-          type="text" 
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={isAdmin ? "Admin search (Products, Collections)..." : "Search products, collections..."}
-          className="w-full rounded-l-md border border-qala-champagne bg-white/70 px-4 py-2 text-sm text-qala-ink placeholder:text-neutral-400 focus:border-qala-bronze focus:outline-none"
-          autoComplete="off"
-        />
-        <button type="submit" className="cursor-pointer rounded-r-md bg-qala-bronze px-4 py-2 text-sm text-white transition hover:bg-qala-espresso">
+      <form onSubmit={handleSubmit} className="flex w-full items-center shadow-sm">
+        <div className="relative flex-1">
+          <input
+            ref={inputRef}
+            type="text" 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={isAdmin ? "Admin search (Products, Collections)..." : "Search products, collections..."}
+            className={`w-full rounded-l-md border border-qala-champagne bg-white/90 pl-4 ${
+              query ? "pr-10" : "pr-4"
+            } py-2 text-sm text-qala-ink placeholder:text-neutral-400 focus:border-qala-bronze focus:outline-none`}
+            autoComplete="off"
+          />
+
+          {/* "X" clear button at the very right side of the search input */}
+          {query.trim() !== "" && (
+            <button
+              type="button"
+              onClick={handleClearQuery}
+              aria-label="Clear search text"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-neutral-400 hover:text-qala-espresso hover:bg-neutral-100 transition-colors cursor-pointer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          className="cursor-pointer shrink-0 rounded-r-md bg-qala-bronze px-4 py-2 text-sm text-white transition hover:bg-qala-espresso"
+        >
           Search
         </button>
+
+        {/* Mobile close button if onClose provided */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close search bar"
+            className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-qala-champagne bg-white text-qala-espresso hover:bg-qala-champagne/30 transition cursor-pointer md:hidden"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+            >
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </form>
 
       {/* Live Results Dropdown */}

@@ -33,16 +33,23 @@ const orderSchema = new Schema(
         shippingInfo: {
             address: { type: String, required: true },
             city: { type: String, required: true },
-            postalCode: { type: String, required: true },
+            postalCode: { type: String, default: "" },
             notes: { type: String }
         },
         items: [orderItemSchema],
         pricing: {
             subtotal: { type: Number, required: true },
+            discount: { type: Number, default: 0 },
             shippingCost: { type: Number, required: true },
             total: { type: Number, required: true }
         },
-        paymentMethod: { type: String, default: "COD" }
+        coupon: {
+            code: { type: String },
+            discountType: { type: String },
+            discountValue: { type: Number },
+            discountAmount: { type: Number }
+        },
+        paymentMethod: { type: String, enum: ["COD", "BANK_TRANSFER"], default: "COD" }
     },
     { timestamps: true }
 );

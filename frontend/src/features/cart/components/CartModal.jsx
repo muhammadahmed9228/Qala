@@ -1,5 +1,5 @@
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { closeCart, removeFromCart, updateQuantity } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
 
@@ -61,16 +61,20 @@ export default function CartModal() {
           ) : (
             items.map((item) => (
               <div key={item.cartItemId} className="flex gap-4 border-b border-qala-champagne pb-4">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="h-24 w-20 object-cover border border-qala-champagne"
-                />
+                <Link to={`/products/${item.productId}`} onClick={() => dispatch(closeCart())}>
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="h-24 w-20 object-cover border border-qala-champagne"
+                  />
+                </Link>
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="font-medium leading-tight text-qala-espresso">
-                      {item.name}
-                    </h3>
+                    <Link to={`/products/${item.productId}`} onClick={() => dispatch(closeCart())}>
+                      <h3 className="font-medium leading-tight text-qala-espresso hover:text-qala-bronze">
+                        {item.name}
+                      </h3>
+                    </Link>
                     <p className="text-xs text-neutral-500 mt-1">
                       {item.color} | Size: {item.size}
                     </p>

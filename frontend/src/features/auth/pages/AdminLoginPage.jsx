@@ -4,10 +4,13 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { loginApi, logoutApi } from "../api/authApi";
 import { setCredentials } from "../authSlice";
+import { Turnstile } from '@marsidev/react-turnstile';
+import PasswordInput from "../../../components/PasswordInput";
 
 export default function AdminLoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState(null);
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -26,10 +29,15 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+    
     setSubmitting(true);
 
     try {
-      const response = await loginApi(formData);
+      const response = await loginApi({ ...formData, turnstileToken });
       const loggedInUser = response.data.user;
 
       if (loggedInUser?.role !== "admin") {
@@ -82,9 +90,8 @@ export default function AdminLoginPage() {
             <label className="block text-sm font-medium mb-2" htmlFor="admin-password">
               Password
             </label>
-            <input
+            <PasswordInput
               id="admin-password"
-              type="password"
               name="password"
               required
               placeholder="Enter password"
@@ -94,6 +101,15 @@ export default function AdminLoginPage() {
               className="w-full px-3 py-2.5 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900"
             />
           </div>
+          
+          <div className="py-2 flex justify-center">
+            <Turnstile 
+              siteKey="0x4AAAAAAEyCT9dIF1IcOxCK" 
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+            />
+          </div>
+
           <button
             type="submit"
             disabled={submitting}

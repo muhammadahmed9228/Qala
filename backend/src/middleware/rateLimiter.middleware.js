@@ -3,25 +3,40 @@ import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
 import { ipKeyGenerator } from "express-rate-limit";
 
-const GLOBAL_LIMIT = 100;
-const ADMIN_LIMIT = 4000; //was 2000
+const GLOBAL_LIMIT = 200;
+const ADMIN_LIMIT = 10000; //was 2000
 const WINDOW_MS = 15 * 60 * 1000;
 
-const getVerifiedAccessToken = (req) => {
+const getAdminToken = (req) => {
+    // Cache the result on the request object since this function is called multiple times per request
+    if (req.adminToken !== undefined) return req.adminToken;
+
     const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
 
-    if (!token || !process.env.ACCESS_TOKEN_SECRET) return null;
-
-    try {
-        return jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    } catch {
+    if (!token || !process.env.ACCESS_TOKEN_SECRET) {
+        req.adminToken = null;
         return null;
     }
-};
 
-const getAdminToken = (req) => {
-    const token = getVerifiedAccessToken(req);
-    return token?.role === "admin" && token?._id ? token : null;
+    // Lightweight payload parsing to prevent CPU exhaustion (jwt.verify is expensive)
+    const decoded = jwt.decode(token);
+    
+    // If the token isn't claiming to be an admin, skip expensive signature verification
+    if (!decoded || decoded.role !== "admin" || !decoded._id) {
+        req.adminToken = null;
+        return null;
+    }
+
+    // It claims to be an admin, so we must verify the signature to prevent forged token exploits
+    try {
+        const verified = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        const adminToken = verified.role === "admin" && verified._id ? verified : null;
+        req.adminToken = adminToken;
+        return adminToken;
+    } catch {
+        req.adminToken = null;
+        return null;
+    }
 };
 
 // Public/customer traffic stays at 100 requests per 15 minutes per IP.
@@ -43,13 +58,24 @@ export const globalLimiter = rateLimit({
     },
 });
 
-// Strict Auth Limiter: 5 failed attempts per 15 minutes per IP
+// Strict Auth Limiter: 6 failed attempts per 15 minutes per IP
 export const authLimiter = rateLimit({
     windowMs: WINDOW_MS,
-    max: 5,
+    max: 6,
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res, next) => {
         next(new ApiError(429, "Too many authentication attempts, please try again later"));
+    },
+});
+
+// Strict Coupon Apply Limiter: 10 attempts per 15 minutes per IP
+export const couponApplyLimiter = rateLimit({
+    windowMs: WINDOW_MS,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res, next) => {
+        next(new ApiError(429, "Too many coupon attempts, please try again later"));
     },
 });

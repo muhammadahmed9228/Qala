@@ -77,7 +77,7 @@ export default function CollectionPage() {
   return (
     <div className="pb-16">
       {/* Collection Hero Banner */}
-      <div className="relative w-full h-64 md:h-80 bg-neutral-900 flex items-center justify-center text-center">
+      <div className="relative min-h-[16rem] py-12 md:py-0 md:h-80 bg-neutral-900 flex items-center justify-center text-center -mx-6 w-[calc(100%+3rem)] md:mx-0 md:w-full overflow-hidden">
         {collection.image?.url && (
           <img src={collection.image.url} alt={collection.name} className="absolute inset-0 w-full h-full object-cover opacity-40" />
         )}

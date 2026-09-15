@@ -186,7 +186,27 @@ export default function DashboardPage() {
                           <p>{order.customerInfo.name}</p>
                           <p className="text-xs text-neutral-500">{order.customerInfo.email}</p>
                         </td>
-                        <td className="px-6 py-4 font-semibold">Rs. {order.pricing.total.toLocaleString()}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-neutral-900">
+                            Rs. {order.pricing?.total?.toLocaleString() ?? 0}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1 text-[11px]">
+                            {order.paymentMethod === "BANK_TRANSFER" ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-200">
+                                Bank (-Rs. 100)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-medium">
+                                COD
+                              </span>
+                            )}
+                            {order.coupon?.code && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium border border-emerald-200">
+                                Coupon: {order.coupon.code}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-neutral-500">{new Date(order.createdAt).toLocaleDateString()}</td>
                         <td className="px-6 py-4 flex flex-col gap-2 items-start">
                           <select

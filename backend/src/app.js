@@ -10,8 +10,9 @@ import { ApiResponse } from "./utils/ApiResponse.js";
 
 const app = express();
 
-// Render runs the service behind a reverse proxy.
-app.set("trust proxy", 1);
+// Render/Cloudflare/AWS runs the service behind a reverse proxy.
+// Set TRUST_PROXY_HOPS in your environment if there are multiple proxies (e.g. Cloudflare -> Render = 2)
+app.set("trust proxy", process.env.TRUST_PROXY_HOPS ? parseInt(process.env.TRUST_PROXY_HOPS, 10) : 1);
 
 // Public process health check for Render and uptime monitors.
 app.get("/health", (req, res) => {
@@ -80,6 +81,8 @@ import adminRouter from "./modules/admin/admin.routes.js";
 import customerRouter from "./modules/customers/customer.routes.js";
 import homeRouter from "./modules/homepage/hero.routes.js";
 import sectionRouter from "./modules/homepage/section.routes.js";
+import announcementRouter from "./modules/announcements/announcement.routes.js";
+import couponRouter from "./modules/coupons/coupon.routes.js";
 
 // Routes Declaration
 app.use(`${API_PREFIX}/auth`, authRouter);
@@ -91,6 +94,8 @@ app.use(`${API_PREFIX}/admin`, adminRouter);
 app.use(`${API_PREFIX}/customers`, customerRouter);
 app.use(`${API_PREFIX}/home`, homeRouter);
 app.use(`${API_PREFIX}/home-sections`, sectionRouter);
+app.use(`${API_PREFIX}/announcements`, announcementRouter);
+app.use(`${API_PREFIX}/coupons`, couponRouter);
 
 // Global Error Handler
 app.use(errorHandler);

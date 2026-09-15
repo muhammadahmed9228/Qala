@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getPublicCollectionsApi } from "../features/products/api/productsApi";
 
-export default function SecondaryNavbar() {
+export default function SecondaryNavbar({ isMobileSearchOpen = false, onCloseSearch }) {
   const [collections, setCollections] = useState([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -110,7 +110,7 @@ export default function SecondaryNavbar() {
           )}
         </div>
 
-        {/* Updated Right Side: Only requested quick links */}
+        {/* Right Side: Quick links and mobile close button if search is open */}
         <div className="flex items-center space-x-6 ml-6 flex-shrink-0">
           <button
             onClick={() => handleSortClick("createdAt")}
@@ -130,6 +130,29 @@ export default function SecondaryNavbar() {
           >
             Featured
           </button>
+
+          {/* Close button on mobile if search or mobile drawer open */}
+          {(isMobileSearchOpen || onCloseSearch) && (
+            <button
+              type="button"
+              onClick={onCloseSearch}
+              aria-label="Close search navbar"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-qala-espresso hover:bg-qala-champagne/40 transition cursor-pointer md:hidden"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

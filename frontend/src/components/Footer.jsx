@@ -1,6 +1,14 @@
+import { useState } from "react";
 import logoImg from "../assets/logo.jpeg";
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
+  const [openSection, setOpenSection] = useState(null);
+
+  const toggleSection = (section) => {
+    setOpenSection(openSection === section ? null : section);
+  };
+
   return (
     <footer className="border-t border-qala-espresso bg-qala-espresso text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -17,65 +25,68 @@ export default function Footer() {
               </span>
             </div>
             <p className="leading-relaxed text-neutral-400">
-              Qala is a contemporary fashion label rooted in traditional
-              craftsmanship and modern elegance. We reimagine traditional
-              artistry for the modern woman through minimal silhouettes, rich
-              handcrafted techniques, and refined embellishment.
+              Qala was created with a simple belief: elegance does not need to be excessive.
+              Rooted in the beauty of Eastern dressing, we create and curate pieces where timeless silhouettes meet thoughtful, contemporary details.
+              Our vision is to offer clothing that feels effortless yet distinctive—pieces you return to, dress in, and make your own.
             </p>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
-              Customer Support
-            </h3>
-            <ul className="mt-4 space-y-3 text-sm text-neutral-300">
+            <button
+              onClick={() => toggleSection('support')}
+              className="flex w-full items-center justify-between md:cursor-default md:pointer-events-none text-left"
+            >
+              <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
+                Customer Support
+              </h3>
+              <span className="text-white md:hidden">
+                {openSection === 'support' ? '−' : '+'}
+              </span>
+            </button>
+            <ul className={`mt-4 space-y-3 text-sm text-neutral-300 overflow-hidden transition-all duration-300 ${openSection === 'support' ? 'max-h-40' : 'max-h-0'} md:max-h-none`}>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Complain
-                </a>
+                <h3 className="text-lg tracking-wide uppercase text-white">
+                  Complains/ Need Help/ Contact
+                </h3>
+                <div className="flex flex-col gap-1">
+                  <span>qala.official1@gmail.com</span>
+                  <span>0332-2363113</span>
+                </div>
               </li>
+
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Need Help
-                </a>
+                <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
+                  Address
+                </h3>
+                {/* <div className="flex flex-col gap-1">
+                  <span>Address (to be filled)</span>            
+                </div> */}
               </li>
-              <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Store Address
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Contact
-                </a>
-              </li>
+
             </ul>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
-              Menu
-            </h3>
-            <ul className="mt-4 space-y-3 text-sm text-neutral-300">
+            <button
+              onClick={() => toggleSection('menu')}
+              className="flex w-full items-center justify-between md:cursor-default md:pointer-events-none text-left"
+            >
+              <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
+                Menu
+              </h3>
+              <span className="text-white md:hidden">
+                {openSection === 'menu' ? '−' : '+'}
+              </span>
+            </button>
+            <ul className={`mt-4 space-y-3 text-sm text-neutral-300 overflow-hidden transition-all duration-300 ${openSection === 'menu' ? 'max-h-40' : 'max-h-0'} md:max-h-none`}>
               <li>
-                <a href="/" className="hover:text-white transition-colors">
-                  Home page
-                </a>
+                <a href="/" className="hover:text-white transition-colors">Home page</a>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Shop
-                </a>
+                <a href="/semi-formal" className="hover:text-white transition-colors">Semi-Formal</a>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  New Arrivals
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Best Sellers
-                </a>
+                <a href="/formal" className="hover:text-white transition-colors">Formal</a>
               </li>
             </ul>
 
@@ -92,7 +103,7 @@ export default function Footer() {
                 >
                   Instagram
                 </a>
-                <a
+                {/* <a
                   href="https://facebook.com"
                   target="_blank"
                   rel="noreferrer"
@@ -107,46 +118,44 @@ export default function Footer() {
                   className="hover:text-white transition-colors"
                 >
                   Twitter
-                </a>
+                </a> */}
               </div>
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
-              INFORMATION
-            </h3>
-            <ul className="mt-4 space-y-3 text-sm text-neutral-300">
+            <button
+              onClick={() => toggleSection('info')}
+              className="flex w-full items-center justify-between md:cursor-default md:pointer-events-none text-left"
+            >
+              <h3 className="text-lg font-semibold tracking-wide uppercase text-white">
+                INFORMATION
+              </h3>
+              <span className="text-white md:hidden">
+                {openSection === 'info' ? '−' : '+'}
+              </span>
+            </button>
+            <ul className={`mt-4 space-y-3 text-sm text-neutral-300 overflow-hidden transition-all duration-300 ${openSection === 'info' ? 'max-h-48' : 'max-h-0'} md:max-h-none`}>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Disclaimer
-                </a>
+                <Link to="/disclaimer" className="hover:text-white transition-colors">Disclaimer</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Privacy Policy
-                </a>
+                <Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Refund Policy
-                </a>
+                <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Shipping Policy
-                </a>
+                <Link to="/shipping-policy" className="hover:text-white transition-colors">Shipping Policy</Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
-                  Terms and Conditions
-                </a>
+                <Link to="/terms-and-conditions" className="hover:text-white transition-colors">Terms and Conditions</Link>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-10 border-t border-qala-bronze/40 pt-8">
+        {/* <div className="mt-10 border-t border-qala-bronze/40 pt-8">
           <div className="mb-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-qala-champagne">
               Crafted by
@@ -211,7 +220,7 @@ export default function Footer() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="mt-10 border-t border-neutral-700 pt-6 text-center text-sm text-neutral-400">
           <p>© {new Date().getFullYear()} Qala. All rights reserved.</p>

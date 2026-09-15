@@ -13,7 +13,12 @@
 }
 
 @layer base {
-  html,
+  html {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+  }
+
   body,
   #root {
     width: 100%;
@@ -35,4 +40,10 @@
     @apply font-serif;
   }
 }
-.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

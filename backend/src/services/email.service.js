@@ -1,31 +1,28 @@
-import nodemailer from "nodemailer";
-import { 
-    getOrderConfirmationTemplate, 
-    getOrderStatusUpdateTemplate, 
-    getPasswordResetTemplate 
+import { Resend } from "resend";
+import {
+    getOrderConfirmationTemplate,
+    getOrderStatusUpdateTemplate,
+    getPasswordResetTemplate
 } from "../utils/emailTemplates.js";
 
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-        },
-    });
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
+const SENDER_EMAIL = "Qala <onboarding@qalaofficial.com>";
 
 const sendEmail = async ({ to, subject, html }) => {
     try {
-        const transporter = createTransporter();
-        await transporter.sendMail({
-            from: `"Qala" <${process.env.SMTP_USER}>`,
+        const { data, error } = await resend.emails.send({
+            from: SENDER_EMAIL,
             to,
             subject,
             html,
         });
-        console.log(`Email sent successfully to ${to}`);
+
+        if (error) {
+            console.error(`Email sending failed to ${to}:`, error.message);
+            return;
+        }
+
+        console.log(`Email sent successfully to ${to} (ID: ${data?.id})`);
     } catch (error) {
         console.error(`Email sending failed to ${to}:`, error.message);
         // We do NOT throw the error to prevent breaking the main transaction flow
@@ -41,8 +38,9 @@ export const sendOrderConfirmationEmail = async (order) => {
 };
 
 export const sendAdminNewOrderNotification = async (order) => {
+    const adminEmail = process.env.ADMIN_EMAIL || "muhammadahmed.zahid2002@gmail.com";
     await sendEmail({
-        to: process.env.SMTP_USER, // Sending to the admin/store email
+        to: adminEmail,
         subject: `New Order Received - #${order.orderNumber}`,
         html: `<p>A new order (#${order.orderNumber}) has been placed by ${order.customerInfo.name} for Rs. ${order.pricing.total}.</p>`
     });

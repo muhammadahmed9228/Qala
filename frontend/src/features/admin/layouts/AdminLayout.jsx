@@ -34,6 +34,8 @@ export default function AdminLayout() {
     { name: "Customers", path: "/admin/customers" },
     { name: "Homepage Config", path: "/admin/hero" },
     { name: "Dynamic Sections", path: "/admin/home-sections" },
+    { name: "Announcements", path: "/admin/announcements" },
+    { name: "Coupons", path: "/admin/coupons" },
     { name: "Back to Home", path: "/" },
   ];
 

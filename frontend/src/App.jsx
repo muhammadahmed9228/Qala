@@ -10,14 +10,23 @@ import {
   logoutSuccess,
   setLoading,
 } from "./features/auth/authSlice";
+import {
+  Disclaimer,
+  PrivacyPolicy,
+  RefundPolicy,
+  ShippingPolicy,
+  TermsAndConditions,
+} from './features/policies';
 
-import AdminHeroPage from "./features/admin/pages/AdminHeroPage"; 
+import AdminHeroPage from "./features/admin/pages/AdminHeroPage";
 import AdminProductsPage from "./features/admin/pages/AdminProductsPage";
 import AdminOrdersPage from "./features/admin/pages/AdminOrdersPage";
 import AdminCustomersPage from "./features/admin/pages/AdminCustomersPage";
 import CreateProductPage from "./features/admin/pages/CreateProductPage";
 import EditProductPage from "./features/admin/pages/EditProductPage";
 import AdminCollectionsPage from "./features/admin/pages/AdminCollectionsPage";
+import AdminAnnouncementsPage from "./features/admin/pages/AdminAnnouncementsPage";
+import AdminCouponsPage from "./features/admin/pages/AdminCouponsPage";
 
 // Layouts
 import RootLayout from "./layouts/RootLayout";
@@ -61,45 +70,55 @@ export default function App() {
       <BrowserRouter>
         <ScrollToTop />
         <Routes>
-        {/* Customer Facing Routes */}
-        <Route path="/" element={<RootLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="collections/:slug" element={<CollectionPage />} />
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
+          {/* Customer Facing Routes */}
+          <Route path="/" element={<RootLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="collections/:slug" element={<CollectionPage />} />
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
 
-          <Route path="products" element={<ProductsPage />} />
-          <Route path="products/:id" element={<ProductDetailPage />} />
-          <Route path="cart" element={<CartPage />} />
-          <Route path="checkout" element={<CheckoutPage />} />
-          <Route path="order-success" element={<OrderSuccessPage />} />
-          <Route path="500" element={<ServerErrorPage />} />
+            {/* Policy Routes */}
+            <Route path="disclaimer" element={<Disclaimer />} />
+            <Route path="privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="refund-policy" element={<RefundPolicy />} />
+            <Route path="shipping-policy" element={<ShippingPolicy />} />
+            <Route path="terms-and-conditions" element={<TermsAndConditions />} />
 
-          {/* Protected Customer Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="profile" element={<ProfilePage />} />
+
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="products/:id" element={<ProductDetailPage />} />
+            <Route path="cart" element={<CartPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="order-success" element={<OrderSuccessPage />} />
+            <Route path="500" element={<ServerErrorPage />} />
+
+            {/* Protected Customer Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="profile" element={<ProfilePage />} />
+            </Route>
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+
+          {/* Admin Facing Routes */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminLayout />}>
+
+              <Route index element={<DashboardPage />} />
+              <Route path="products" element={<AdminProductsPage />} />
+              <Route path="orders" element={<AdminOrdersPage />} />
+              <Route path="customers" element={<AdminCustomersPage />} />
+              <Route path="products/new" element={<CreateProductPage />} />
+              <Route path="products/:id/edit" element={<EditProductPage />} />
+              <Route path="hero" element={<AdminHeroPage />} />
+              <Route path="collections" element={<AdminCollectionsPage />} />
+              <Route path="home-sections" element={<AdminHomeSectionsPage />} />
+              <Route path="announcements" element={<AdminAnnouncementsPage />} />
+              <Route path="coupons" element={<AdminCouponsPage />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFoundPage />} />
-        </Route>
-
-        {/* Admin Facing Routes */}
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminLayout />}>
-
-            <Route index element={<DashboardPage />} />
-            <Route path="products" element={<AdminProductsPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="customers" element={<AdminCustomersPage />} />
-            <Route path="products/new" element={<CreateProductPage />} />
-            <Route path="products/:id/edit" element={<EditProductPage />} />
-            <Route path="hero" element={<AdminHeroPage />} />
-            <Route path="collections" element={<AdminCollectionsPage />} />
-            <Route path="home-sections" element={<AdminHomeSectionsPage />} />
-          </Route>
-        </Route>
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+        </Routes>
       </BrowserRouter>
     </>
   );

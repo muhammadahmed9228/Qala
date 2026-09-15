@@ -16,6 +16,7 @@ import SecondaryNavbar from "../components/SecondaryNavbar";
 import WhatsAppButton from "../components/WhatsAppButton";
 import Footer from "../components/Footer";
 import { getPublicCollectionsApi } from "../features/products/api/productsApi";
+import AnnouncementBar from "../components/AnnouncementBar";
 
 export default function RootLayout() {
   const dispatch = useDispatch();
@@ -94,6 +95,7 @@ export default function RootLayout() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
+      {!isCheckoutPage && <AnnouncementBar />}
       <header className={`${isCheckoutPage ? "hidden" : "hidden md:block"} sticky top-0 z-60 overflow-visible border-b border-qala-bronze/30 bg-qala-cream/95 backdrop-blur-md transition-transform duration-300 ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link
@@ -194,13 +196,19 @@ export default function RootLayout() {
                   setIsMobileSearchOpen((open) => !open);
                   setIsMobileMenuOpen(false);
                 }}
-                aria-label="Search"
-                className="flex h-10 w-10 items-center justify-center text-qala-espresso"
+                aria-label={isMobileSearchOpen ? "Close search" : "Open search"}
+                className="flex h-10 w-10 items-center justify-center text-qala-espresso cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
-                  <circle cx="11" cy="11" r="6.5" />
-                  <path strokeLinecap="round" d="m16 16 4.25 4.25" />
-                </svg>
+                {isMobileSearchOpen ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path strokeLinecap="round" d="m16 16 4.25 4.25" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"
@@ -214,12 +222,30 @@ export default function RootLayout() {
                 </svg>
                 {totalCartItems > 0 && <span className="absolute right-0 top-0 min-w-4 rounded-full bg-qala-bronze px-1 text-center text-[10px] font-bold text-white">{totalCartItems}</span>}
               </button>
+
+              {isAuthenticated ? (
+                <Link to="/profile" aria-label="Open profile" className="flex h-10 w-10 items-center justify-center text-qala-espresso">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-qala-espresso text-sm" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                      <circle cx="12" cy="8" r="3.5" />
+                      <path strokeLinecap="round" d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
+                    </svg>
+                  </span>
+                </Link>
+              ) : (
+                <Link to="/login" aria-label="Sign In" className="flex h-10 w-10 items-center justify-center text-qala-espresso">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-6 w-6" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.5" />
+                    <path strokeLinecap="round" d="M5 20c.8-3.2 3.2-5 7-5s6.2 1.8 7 5" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
 
           {isMobileSearchOpen && (
             <div className="border-t border-qala-champagne bg-qala-cream px-4 py-3">
-              <SearchBar isAdmin={false} />
+              <SearchBar isAdmin={false} onClose={() => setIsMobileSearchOpen(false)} />
             </div>
           )}
 
@@ -237,6 +263,20 @@ export default function RootLayout() {
                     {collection.name}
                   </Link>
                 ))}
+                
+                {isAuthenticated && (
+                  <div className="pt-4 pb-2">
+                    <button 
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        handleLogout();
+                      }} 
+                      className="block w-full text-left font-bold text-red-500 border-b border-neutral-100 px-2 py-3 uppercase tracking-wider text-xs hover:bg-neutral-50"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
               </nav>
             </div>
           )}

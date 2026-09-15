@@ -4,6 +4,7 @@ import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { User } from "../auth/user.model.js";
 import crypto from "crypto";
+import axios from "axios";
 import { sendPasswordResetEmail } from "../../services/email.service.js";
 
 // Part 1
@@ -29,10 +30,33 @@ const cookieOptions = {
 };
 
 export const registerUser = asyncHandler(async (req, res) => {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, turnstileToken } = req.body;
+
+    if (!turnstileToken) {
+        return res.status(400).json({ message: "Security token is missing." });
+    }
+
+    try {
+        // The user prompt said 'https://cloudflare.com', but the actual endpoint for Turnstile is this one.
+        // Using the standard Turnstile endpoint to ensure it works correctly.
+        const turnstileRes = await axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken
+        });
+
+        if (!turnstileRes.data.success) {
+            return res.status(400).json({ message: "Security verification failed. Automated request blocked." });
+        }
+    } catch (error) {
+        return res.status(400).json({ message: "Security verification failed. Automated request blocked." });
+    }
 
     if ([name, email, password].some((field) => field?.trim() === "")) {
         throw new ApiError(400, "Name, email, and password are required");
+    }
+
+    if (password.length < 6 || password.length > 8) {
+        throw new ApiError(400, "Password must be between 6 and 8 characters long");
     }
 
     const existedUser = await User.findOne({ email });
@@ -59,7 +83,24 @@ export const registerUser = asyncHandler(async (req, res) => {
 });
 
 export const loginUser = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, turnstileToken } = req.body;
+
+    if (!turnstileToken) {
+        return res.status(400).json({ message: "Security token is missing." });
+    }
+
+    try {
+        const turnstileRes = await axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken
+        });
+
+        if (!turnstileRes.data.success) {
+            return res.status(400).json({ message: "Security verification failed." });
+        }
+    } catch (error) {
+        return res.status(400).json({ message: "Security verification failed." });
+    }
 
     if (!email || !password) {
         throw new ApiError(400, "Email and password are required");
@@ -118,15 +159,28 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
 export const changeCurrentPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body;
 
-    if (!oldPassword || !newPassword) {
-        throw new ApiError(400, "Old and new passwords are required");
+    if (!newPassword) {
+        throw new ApiError(400, "New password is required");
     }
 
-    const user = await User.findById(req.user._id);
-    const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+    if (newPassword.length < 6 || newPassword.length > 8) {
+        throw new ApiError(400, "New password must be between 6 and 8 characters long");
+    }
 
-    if (!isPasswordValid) {
-        throw new ApiError(400, "Invalid old password");
+    const user = await User.findById(req.user?._id);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // If user already has a password set, verify old password
+    if (user.password) {
+        if (!oldPassword) {
+            throw new ApiError(400, "Current password is required");
+        }
+        const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+        if (!isPasswordValid) {
+            throw new ApiError(400, "Invalid old password");
+        }
     }
 
     user.password = newPassword;
@@ -134,7 +188,7 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, {}, "Password changed successfully"));
+        .json(new ApiResponse(200, {}, "Password updated successfully"));
 });
 
 export const updateAccountDetails = asyncHandler(async (req, res) => {
@@ -193,6 +247,10 @@ export const resetPassword = asyncHandler(async (req, res) => {
 
     if (!newPassword) {
         throw new ApiError(400, "New password is required");
+    }
+
+    if (newPassword.length < 6 || newPassword.length > 8) {
+        throw new ApiError(400, "New password must be between 6 and 8 characters long");
     }
 
     // Hash the token from params to compare with the one in DB

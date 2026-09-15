@@ -65,3 +65,18 @@ export const createHomeSectionApi = (data) => apiClient.post("/home-sections", d
 export const updateHomeSectionApi = (id, data) => apiClient.patch(`/home-sections/${id}`, data);
 export const deleteHomeSectionApi = (id) => apiClient.delete(`/home-sections/${id}`);
 
+// Announcement APIs
+export const getAdminAnnouncementsApi = (params) => apiClient.get("/announcements", { params });
+export const saveAnnouncementApi = (data) => {
+    if (data.id) return apiClient.put(`/announcements`, data);
+    return apiClient.post("/announcements", data);
+};
+export const deleteAnnouncementApi = (id) => apiClient.delete(`/announcements/${id}`);
+export const toggleAnnouncementStatusApi = (id) => apiClient.patch(`/announcements/${id}/toggle-status`);
+
+// Coupon APIs
+export const getCouponsApi = (params) => apiClient.get("/coupons", { params });
+export const createCouponApi = (data) => apiClient.post("/coupons", data);
+export const updateCouponApi = (id, data) => apiClient.patch(`/coupons/${id}`, data);
+export const deleteCouponApi = (id) => apiClient.delete(`/coupons/${id}`);
+export const toggleCouponStatusApi = (id) => apiClient.patch(`/coupons/${id}/toggle-status`);

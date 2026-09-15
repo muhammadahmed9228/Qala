@@ -271,8 +271,26 @@ const [search, setSearch] = useState("");
                         {order.customerInfo.email}
                       </p>
                     </td>
-                    <td className="px-6 py-4 font-semibold">
-                      Rs. {order.pricing.total.toLocaleString()}
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-neutral-900">
+                        Rs. {order.pricing?.total?.toLocaleString() ?? 0}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1 text-[11px]">
+                        {order.paymentMethod === "BANK_TRANSFER" ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium border border-blue-200">
+                            Bank (-Rs. 100)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 font-medium">
+                            COD
+                          </span>
+                        )}
+                        {order.coupon?.code && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-medium border border-emerald-200">
+                            Coupon: {order.coupon.code}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-neutral-500">
                       {new Date(order.createdAt).toLocaleDateString()}
@@ -337,8 +355,8 @@ const [search, setSearch] = useState("");
                 <h4 className="font-bold border-b pb-2 mb-3">Shipping Info</h4>
                 <p>{selectedOrder.shippingInfo.address}</p>
                 <p>
-                  {selectedOrder.shippingInfo.city},{" "}
-                  {selectedOrder.shippingInfo.postalCode}
+                  {selectedOrder.shippingInfo.city}
+                  {selectedOrder.shippingInfo.postalCode ? `, ${selectedOrder.shippingInfo.postalCode}` : ""}
                 </p>
                 {selectedOrder.shippingInfo.notes && (
                   <p className="mt-2 text-neutral-500 italic">
@@ -395,29 +413,88 @@ const [search, setSearch] = useState("");
               </div>
             </div>
 
-            <div className="flex justify-between items-center bg-neutral-900 text-white p-4 rounded">
-              <div>
-                <p className="text-xs text-neutral-300">
-                  Payment: {selectedOrder.paymentMethod}
-                </p>
-                <p className="text-xs text-neutral-300">
-                  Status: {selectedOrder.status}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm">
-                  Subtotal: Rs.{" "}
-                  {selectedOrder.pricing.subtotal.toLocaleString()}
-                </p>
-                <p className="text-sm border-b border-neutral-700 pb-1 mb-1">
-                  Shipping: Rs.{" "}
-                  {selectedOrder.pricing.shippingCost.toLocaleString()}
-                </p>
-                <p className="text-lg font-bold">
-                  Total: Rs. {selectedOrder.pricing.total.toLocaleString()}
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const isBankTransfer = selectedOrder.paymentMethod === "BANK_TRANSFER";
+              const bankDiscount = isBankTransfer ? 100 : 0;
+              const couponDiscount = selectedOrder.coupon?.discountAmount != null
+                ? selectedOrder.coupon.discountAmount
+                : selectedOrder.coupon?.code
+                ? Math.max(0, (selectedOrder.pricing?.discount || 0) - bankDiscount)
+                : 0;
+
+              return (
+                <div className="bg-neutral-900 text-white p-5 rounded-lg space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-3 border-b border-neutral-800 text-xs">
+                    <div>
+                      <span className="text-neutral-400 block mb-1">Payment Method & Status</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-white text-sm">
+                          {isBankTransfer ? "Bank Transfer" : selectedOrder.paymentMethod || "COD"}
+                        </span>
+                        {isBankTransfer && (
+                          <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-medium">
+                            -Rs. 100 (Bank Discount)
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                          Status: {selectedOrder.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-neutral-400 block mb-1">Coupon Details</span>
+                      {selectedOrder.coupon?.code ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs">
+                            Applied: {selectedOrder.coupon.code}
+                          </span>
+                          <span className="text-neutral-300 text-xs">
+                            {selectedOrder.coupon.discountType === "percentage"
+                              ? `(${selectedOrder.coupon.discountValue}% off)`
+                              : selectedOrder.coupon.discountValue
+                              ? `(Rs. ${selectedOrder.coupon.discountValue} off)`
+                              : ""}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-neutral-400 italic">No coupon applied</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-sm max-w-xs ml-auto">
+                    <div className="flex justify-between text-neutral-300">
+                      <span>Subtotal:</span>
+                      <span className="font-medium">Rs. {selectedOrder.pricing?.subtotal?.toLocaleString() ?? 0}</span>
+                    </div>
+
+                    {selectedOrder.coupon?.code && (
+                      <div className="flex justify-between text-emerald-400">
+                        <span>Coupon ({selectedOrder.coupon.code}):</span>
+                        <span className="font-medium">-Rs. {couponDiscount.toLocaleString()}</span>
+                      </div>
+                    )}
+
+                    {isBankTransfer && (
+                      <div className="flex justify-between text-blue-300">
+                        <span>Bank Transfer Discount:</span>
+                        <span className="font-medium">-Rs. 100</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-neutral-300">
+                      <span>Shipping Fee:</span>
+                      <span className="font-medium">Rs. {selectedOrder.pricing?.shippingCost?.toLocaleString() ?? 0}</span>
+                    </div>
+
+                    <div className="border-t border-neutral-700 pt-2 mt-2 flex justify-between items-baseline font-bold text-white">
+                      <span className="text-base">Resultant Total:</span>
+                      <span className="text-xl text-white">Rs. {selectedOrder.pricing?.total?.toLocaleString() ?? 0}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
       </Modal>

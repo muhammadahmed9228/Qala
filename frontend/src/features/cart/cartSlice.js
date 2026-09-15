@@ -13,10 +13,24 @@ const loadCartFromStorage = () => {
   }
 };
 
+const loadCouponFromStorage = () => {
+  const storedCoupon = localStorage.getItem("cartCoupon");
+  if (!storedCoupon || storedCoupon === "undefined" || storedCoupon === "null") {
+    return null;
+  }
+  try {
+    return JSON.parse(storedCoupon);
+  } catch (error) {
+    console.error("Failed to parse cartCoupon", error);
+    return null;
+  }
+};
+
 const cartSlice = createSlice({
   name: "cart",
   initialState: {
     items: loadCartFromStorage(),
+    coupon: loadCouponFromStorage(),
     isCartOpen: false,
   },
   reducers: {
@@ -60,7 +74,17 @@ const cartSlice = createSlice({
     },
     clearCart: (state) => {
       state.items = [];
+      state.coupon = null;
       localStorage.removeItem("cartItems");
+      localStorage.removeItem("cartCoupon");
+    },
+    applyCoupon: (state, action) => {
+      state.coupon = action.payload;
+      localStorage.setItem("cartCoupon", JSON.stringify(action.payload));
+    },
+    removeCoupon: (state) => {
+      state.coupon = null;
+      localStorage.removeItem("cartCoupon");
     },
     toggleCart: (state) => {
       state.isCartOpen = !state.isCartOpen;
@@ -71,5 +95,5 @@ const cartSlice = createSlice({
   },
 });
 
-export const { addToCart, updateQuantity, removeFromCart, clearCart, toggleCart, closeCart } = cartSlice.actions;
+export const { addToCart, updateQuantity, removeFromCart, clearCart, toggleCart, closeCart, applyCoupon, removeCoupon } = cartSlice.actions;
 export default cartSlice.reducer;

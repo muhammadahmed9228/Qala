@@ -1,12 +1,17 @@
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
-import { updateQuantity, removeFromCart } from "../cartSlice";
+import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
+import { useState } from "react";
+import { toast } from "react-toastify";
+import { validateCouponApi } from "../../checkout/api/checkoutApi";
 
 export default function CartPage() {
-  const { items } = useSelector((state) => state.cart);
+  const { items, coupon } = useSelector((state) => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [couponInput, setCouponInput] = useState("");
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
   const subtotal = items.reduce(
     (total, item) =>
@@ -15,6 +20,32 @@ export default function CartPage() {
         item.quantity,
     0,
   );
+
+  let discount = 0;
+  if (coupon) {
+    if (coupon.discountType === "percentage") {
+      discount = (subtotal * coupon.discountValue) / 100;
+    } else {
+      discount = coupon.discountValue;
+    }
+  }
+  const estimatedTotal = Math.max(0, subtotal - discount);
+
+  const handleApplyCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponInput.trim()) return;
+    setIsValidatingCoupon(true);
+    try {
+      const res = await validateCouponApi(couponInput, subtotal);
+      dispatch(applyCoupon(res.data.coupon));
+      setCouponInput("");
+      toast.success("Coupon applied successfully!");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Invalid coupon code");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -47,16 +78,20 @@ export default function CartPage() {
               key={item.cartItemId}
               className="flex gap-4 border border-qala-champagne bg-white p-3 md:p-4"
             >
-              <img
-                src={item.image}
-                alt={item.name}
-                className="h-32 w-24 object-cover"
-              />
+              <Link to={`/products/${item.productId}`}>
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="h-32 w-24 object-cover hover:opacity-80 transition"
+                />
+              </Link>
 
               <div className="flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-medium text-qala-espresso">{item.name}</h3>
+                    <Link to={`/products/${item.productId}`}>
+                      <h3 className="text-lg font-medium text-qala-espresso hover:text-qala-bronze">{item.name}</h3>
+                    </Link>
                     <button
                       onClick={() => dispatch(removeFromCart(item.cartItemId))}
                       className="text-sm text-qala-bronze hover:underline"
@@ -145,14 +180,48 @@ export default function CartPage() {
             <span>Subtotal ({items.length} items)</span>
             <span>Rs. {subtotal.toLocaleString()}</span>
           </div>
+
+          {coupon && (
+            <div className="flex justify-between text-green-600 font-medium">
+              <div className="flex items-center gap-2">
+                <span>Discount ({coupon.code})</span>
+                <button 
+                  onClick={() => dispatch(removeCoupon())}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+              <span>-Rs. {discount.toLocaleString()}</span>
+            </div>
+          )}
+
           <div className="flex justify-between text-neutral-600">
             <span>Shipping</span>
             <span>Calculated at checkout</span>
           </div>
           <div className="flex justify-between border-t border-qala-champagne pt-3 text-lg font-bold text-qala-espresso">
             <span>Estimated Total</span>
-            <span>Rs. {subtotal.toLocaleString()}</span>
+            <span>Rs. {estimatedTotal.toLocaleString()}</span>
           </div>
+
+          {/* Coupon Input Form */}
+          <form onSubmit={handleApplyCoupon} className="mt-4 flex gap-2">
+            <input
+              type="text"
+              placeholder="Coupon Code"
+              value={couponInput}
+              onChange={(e) => setCouponInput(e.target.value)}
+              className="w-full border border-qala-champagne bg-white px-3 py-2 text-sm text-qala-espresso outline-none focus:border-qala-bronze"
+            />
+            <button
+              type="submit"
+              disabled={isValidatingCoupon || !couponInput.trim()}
+              className="bg-qala-espresso px-4 py-2 text-sm font-medium text-white transition hover:bg-qala-bronze disabled:opacity-50"
+            >
+              {isValidatingCoupon ? "Applying..." : "Apply"}
+            </button>
+          </form>
 
           <button
             onClick={() => navigate("/checkout")}

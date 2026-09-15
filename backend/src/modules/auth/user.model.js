@@ -26,6 +26,8 @@ const userSchema = new Schema(
                 },
                 "Password is required"
             ],
+            minlength: [6, "Password must be at least 6 characters long"],
+            maxlength: [8, "Password must be at most 8 characters long"],
         },
         // NEW: Google Auth Fields
         googleId: {
@@ -63,6 +65,7 @@ userSchema.pre("save", async function () {
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
+    if (!this.password || !password) return false;
     return await bcrypt.compare(password, this.password);
 };
 

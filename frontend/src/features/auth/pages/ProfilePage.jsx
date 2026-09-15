@@ -111,6 +111,7 @@ import { toast } from "react-toastify";
 import { updateProfileApi, changePasswordApi } from "../api/authApi";
 import { getMyOrdersApi } from "../../orders/api/ordersApi";
 import { setCredentials } from "../authSlice";
+import PasswordInput from "../../../components/PasswordInput";
 
 export default function ProfilePage() {
   const { user } = useSelector((state) => state.auth);
@@ -235,21 +236,21 @@ export default function ProfilePage() {
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Current Password</label>
-                <input
-                  type="password"
+                <PasswordInput
+                  name="oldPassword"
                   value={passwordData.oldPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-md"
+                  placeholder="Enter current password"
                   required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">New Password</label>
-                <input
-                  type="password"
+                <PasswordInput
+                  name="newPassword"
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-md"
+                  placeholder="Enter new password"
                   required
                 />
               </div>

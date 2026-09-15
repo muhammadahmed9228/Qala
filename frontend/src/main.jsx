@@ -7,6 +7,11 @@ import "./index.css";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 
+// Disable browser native scroll restoration immediately so it does not interfere with async page loads
+if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+  window.history.scrollRestoration = "manual";
+}
+
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 ReactDOM.createRoot(document.getElementById("root")).render(

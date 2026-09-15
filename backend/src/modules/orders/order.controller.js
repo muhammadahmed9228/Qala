@@ -8,95 +8,28 @@ import {
     sendAdminNewOrderNotification,
     sendOrderStatusEmail
 } from "../../services/email.service.js";
-
-// export const createOrder = asyncHandler(async (req, res) => {
-//     const { customerInfo, shippingInfo, items } = req.body;
-
-//     if (!items || items.length === 0) {
-//         throw new ApiError(400, "Order items cannot be empty");
-//     }
-
-//     let calculatedSubtotal = 0;
-//     const orderItemsSnapshot = [];
-
-//     // 1. Authoritative Backend Price Calculation & Stock Verification
-//     for (const item of items) {
-//         const product = await Product.findById(item.productId);
-//         if (!product) throw new ApiError(404, `Product ${item.name} not found`);
-
-//         const variant = product.variants.find(v => v.colorName === item.color);
-//         if (!variant) throw new ApiError(400, `Color ${item.color} invalid for ${product.name}`);
-
-//         const sizeObj = variant.sizes.find(s => s.sku === item.sku);
-//         if (!sizeObj) throw new ApiError(400, `SKU ${item.sku} invalid`);
-
-//         if (sizeObj.stock < item.quantity) {
-//             throw new ApiError(400, `Insufficient stock for ${product.name} (${item.size}). Available: ${sizeObj.stock}`);
-//         }
-
-//         // Calculate authoritative price
-//         const currentBasePrice = product.basePrice + (sizeObj.priceVariation || 0);
-//         const finalUnitPrice = product.discount
-//             ? currentBasePrice - (currentBasePrice * (product.discount / 100))
-//             : currentBasePrice;
-
-//         calculatedSubtotal += finalUnitPrice * item.quantity;
-
-//         orderItemsSnapshot.push({
-//             productId: product._id,
-//             name: product.name,
-//             sku: sizeObj.sku,
-//             color: variant.colorName,
-//             size: sizeObj.size,
-//             quantity: item.quantity,
-//             unitPrice: finalUnitPrice,
-//             image: item.image
-//         });
-//     }
-
-//     const shippingCost = 250; // Fixed flat rate for V1 COD
-//     const total = calculatedSubtotal + shippingCost;
-
-//     // 2. Stock Deduction
-//     for (const item of orderItemsSnapshot) {
-//         await Product.updateOne(
-//             { _id: item.productId },
-//             {
-//                 $inc:
-//                 {
-//                     "variants.$[v].sizes.$[s].stock": -item.quantity,
-//                     "soldCount": item.quantity // Automatically increases sales counter!
-//                 }
-//             },
-//             { arrayFilters: [{ "v.colorName": item.color }, { "s.sku": item.sku }] }
-//         );
-//     }
-
-//     // 3. Order Creation
-//     const orderNumber = `NBT-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-
-//     const order = await Order.create({
-//         orderNumber,
-//         userRef: req.user?._id || null, // Associates with account if logged in via optionalAuth
-//         customerInfo,
-//         shippingInfo,
-//         items: orderItemsSnapshot,
-//         pricing: {
-//             subtotal: calculatedSubtotal,
-//             shippingCost,
-//             total
-//         }
-//     });
-
-//     //PHASE 12: Fire off emails asynchronously
-//     sendOrderConfirmationEmail(order);
-//     sendAdminNewOrderNotification(order);
-
-//     return res.status(201).json(new ApiResponse(201, order, "Order placed successfully"));
-// });
+import axios from "axios";
+import { validateCoupon } from "../coupons/coupon.service.js";
 
 export const createOrder = asyncHandler(async (req, res) => {
-    const { customerInfo, shippingInfo, items } = req.body;
+    const { customerInfo, shippingInfo, items, turnstileToken, couponCode, paymentMethod } = req.body;
+
+    if (!turnstileToken) {
+        return res.status(400).json({ message: "Security token is missing." });
+    }
+
+    try {
+        const turnstileRes = await axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            secret: process.env.TURNSTILE_SECRET_KEY,
+            response: turnstileToken
+        });
+
+        if (!turnstileRes.data.success) {
+            return res.status(400).json({ message: "Security verification failed." });
+        }
+    } catch (error) {
+        return res.status(400).json({ message: "Security verification failed." });
+    }
 
     if (!items || items.length === 0) {
         throw new ApiError(400, "Order items cannot be empty");
@@ -151,8 +84,43 @@ export const createOrder = asyncHandler(async (req, res) => {
         });
     }
 
+    let discountAmount = 0;
+    let appliedCoupon = null;
+
+    if (couponCode) {
+        try {
+            // NEW: Enforce one-time use of coupon per email address
+            const previousOrder = await Order.findOne({
+                "customerInfo.email": { $regex: new RegExp(`^${customerInfo.email}$`, "i") },
+                "coupon.code": couponCode.toUpperCase(),
+                status: { $ne: "Cancelled" }
+            });
+
+            if (previousOrder) {
+                throw new ApiError(400, "You have already used this coupon code.");
+            }
+
+            const result = await validateCoupon(couponCode, calculatedSubtotal);
+            discountAmount = result.discountAmount;
+            appliedCoupon = {
+                code: result.coupon.code,
+                discountType: result.coupon.discountType,
+                discountValue: result.coupon.discountValue,
+                discountAmount: result.discountAmount
+            };
+        } catch (error) {
+            throw new ApiError(400, `Coupon Error: ${error.message}`);
+        }
+    }
+
     const shippingCost = 250;
-    const total = calculatedSubtotal + shippingCost;
+    
+    // NEW: Apply Rs 100 bank transfer discount
+    if (paymentMethod === "BANK_TRANSFER") {
+        discountAmount += 100;
+    }
+
+    const total = calculatedSubtotal - discountAmount + shippingCost;
 
     // 2. Stock Deduction
     for (const item of orderItemsSnapshot) {
@@ -185,18 +153,32 @@ export const createOrder = asyncHandler(async (req, res) => {
         orderNumber,
         userRef: req.user?._id || null, // Associates with account if logged in via optionalAuth
         customerInfo,
-        shippingInfo,
+        shippingInfo: {
+            address: shippingInfo?.address,
+            city: shippingInfo?.city,
+            postalCode: shippingInfo?.postalCode || "",
+            notes: shippingInfo?.notes || ""
+        },
         items: orderItemsSnapshot,
         pricing: {
             subtotal: calculatedSubtotal,
+            discount: discountAmount,
             shippingCost,
             total
-        }
+        },
+        coupon: appliedCoupon,
+        paymentMethod: paymentMethod || "COD"
     });
 
-    //PHASE 12: Fire off emails asynchronously
-    sendOrderConfirmationEmail(order);
-    sendAdminNewOrderNotification(order);
+    //PHASE 12: Fire off emails asynchronously and in parallel
+    try {
+        await Promise.allSettled([
+            sendOrderConfirmationEmail(order),
+            sendAdminNewOrderNotification(order)
+        ]);
+    } catch (error) {
+        console.error("Email dispatch failed during order creation:", error);
+    }
 
     return res.status(201).json(new ApiResponse(201, order, "Order placed successfully"));
 });
@@ -333,7 +315,11 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
 
     //PHASE 12: Trigger status email
-    sendOrderStatusEmail(order);
+    try {
+        await sendOrderStatusEmail(order);
+    } catch (error) {
+        console.error("Status email dispatch failed:", error);
+    }
     return res.status(200).json(new ApiResponse(200, order, "Order status updated successfully"));
 });
 
