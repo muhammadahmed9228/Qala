@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import SEO from "../components/SEO";
 
 export default function NotFoundPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-6 py-16 text-center">
+      <SEO title="Page Not Found | Qala" description="The requested Qala page could not be found." noindex />
       <div className="max-w-md">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-500">Error 404</p>
         <h1 className="mt-4 font-serif text-5xl font-bold text-neutral-900">Page not found</h1>

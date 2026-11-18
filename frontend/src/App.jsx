@@ -41,6 +41,7 @@ import HomePage from "./pages/HomePage";
 import LoginPage from "./features/auth/pages/LoginPage";
 import AdminLoginPage from "./features/auth/pages/AdminLoginPage";
 import RegisterPage from "./features/auth/pages/RegisterPage";
+import VerifyEmailPage from "./features/auth/pages/VerifyEmailPage";
 import ProfilePage from "./features/auth/pages/ProfilePage";
 import ProductsPage from "./features/products/pages/ProductsPage";
 import ProductDetailPage from "./features/products/pages/ProductDetailPage";
@@ -66,7 +67,14 @@ export default function App() {
 
   return (
     <>
-      <ToastContainer position="bottom-right" autoClose={3000} />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        closeOnClick
+        pauseOnHover
+        newestOnTop
+        toastClassName="qala-toast"
+      />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>
@@ -76,6 +84,7 @@ export default function App() {
             <Route path="collections/:slug" element={<CollectionPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            <Route path="verify-email/:token" element={<VerifyEmailPage />} />
 
             {/* Policy Routes */}
             <Route path="disclaimer" element={<Disclaimer />} />

@@ -9,6 +9,7 @@ import {
 import CollectionForm from "../components/CollectionForm";
 import Modal from "../components/Modal";
 import Pagination from "../components/Pagination";
+import ActionIcon from "../components/ActionIcon";
 
 export default function AdminCollectionsPage() {
   const [collections, setCollections] = useState([]);
@@ -17,6 +18,7 @@ export default function AdminCollectionsPage() {
   const [editingCollection, setEditingCollection] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // NEW: Pagination & Sorting State
   const [page, setPage] = useState(1);
@@ -121,7 +123,10 @@ export default function AdminCollectionsPage() {
       )}
 
       {/* NEW: Sorting & Limit Controls */}
-      <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4">
+      <button type="button" onClick={() => setShowFilters((open) => !open)} className="mb-3 w-full rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 md:hidden">
+        {showFilters ? "Hide Search & Filters" : "Search & Filter"}
+      </button>
+      <div className={`${showFilters ? "flex" : "hidden md:flex"} flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Show:</label>
           <select
@@ -212,7 +217,7 @@ export default function AdminCollectionsPage() {
               </thead>
               <tbody className="divide-y divide-neutral-200">
                 {collections.map((col) => (
-                  <tr key={col._id} className="hover:bg-neutral-50">
+                  <tr key={col._id} onClick={() => setSelectedCollection(col)} className="cursor-pointer hover:bg-neutral-50">
                     <td className="px-6 py-4 font-medium text-neutral-900">
                       {col.name}
                     </td>
@@ -225,24 +230,24 @@ export default function AdminCollectionsPage() {
                         {col.enabled ? "Active" : "Disabled"}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setSelectedCollection(col)}
                         className="text-blue-600 hover:underline mr-3"
                       >
-                        View
+                        <ActionIcon type="view" label="View" />
                       </button>
                       <button
                         onClick={() => handleEdit(col)}
                         className="text-indigo-600 hover:underline mr-3"
                       >
-                        Edit
+                        <ActionIcon type="edit" label="Edit" />
                       </button>
                       <button
                         onClick={() => handleDelete(col._id)}
                         className="text-red-600 hover:underline"
                       >
-                        Delete
+                        <ActionIcon type="delete" label="Delete" />
                       </button>
                     </td>
                   </tr>

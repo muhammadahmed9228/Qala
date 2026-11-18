@@ -19,6 +19,7 @@ export default function AdminHeroPage() {
   const [editingSlide, setEditingSlide] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [selectedSlide, setSelectedSlide] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // NEW: Pagination & Sorting State
   const [page, setPage] = useState(1);
@@ -118,7 +119,10 @@ export default function AdminHeroPage() {
       )}
 
       {/* NEW: Sorting & Limit Controls */}
-      <div className="flex items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm">
+      <button type="button" onClick={() => setShowFilters((open) => !open)} className="mb-3 w-full rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 md:hidden">
+        {showFilters ? "Hide Search & Filters" : "Search & Filter"}
+      </button>
+      <div className={`${showFilters ? "flex" : "hidden md:flex"} items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Show:</label>
           <select
@@ -169,7 +173,8 @@ export default function AdminHeroPage() {
             {slides.map((slide) => (
               <div
                 key={slide._id}
-                className="group relative overflow-hidden rounded-lg border border-qala-champagne bg-white shadow-sm"
+                onClick={() => setSelectedSlide(slide)}
+                className="group relative cursor-pointer overflow-hidden rounded-lg border border-qala-champagne bg-white shadow-sm"
               >
                 <img
                   src={slide.image.url}
@@ -194,19 +199,19 @@ export default function AdminHeroPage() {
                 {/* Hover Actions */}
                 <div className="absolute right-2 top-2 flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button
-                    onClick={() => setSelectedSlide(slide)}
+                    onClick={(e) => { e.stopPropagation(); setSelectedSlide(slide); }}
                     className="rounded-md bg-qala-bronze p-2 text-white shadow transition hover:bg-qala-espresso"
                   >
                     👁️
                   </button>
                   <button
-                    onClick={() => handleEdit(slide)}
+                    onClick={(e) => { e.stopPropagation(); handleEdit(slide); }}
                     className="rounded-md border border-qala-champagne bg-qala-cream p-2 text-qala-espresso shadow hover:bg-qala-champagne"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(slide._id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(slide._id); }}
                     className="bg-red-600 text-white p-2 rounded-md shadow hover:bg-red-700"
                   >
                     ✕

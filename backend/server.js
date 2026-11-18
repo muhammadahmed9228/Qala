@@ -3,10 +3,17 @@ import { app } from "./src/app.js";
 
 const PORT = process.env.PORT || 6000;
 
-app.listen(PORT, () => {
-    console.log(`⚙️ Server is running at port : ${PORT}`);
-});
+const startServer = async () => {
+    try {
+        await connectDB();
 
-connectDB().catch((err) => {
-    console.log("MongoDB connection failed !!! ", err);
-});
+        app.listen(PORT, () => {
+            console.log(`Server is running at port : ${PORT}`);
+        });
+    } catch (error) {
+        console.error("Server startup aborted: MongoDB connection failed", error);
+        process.exitCode = 1;
+    }
+};
+
+startServer();

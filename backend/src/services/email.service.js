@@ -2,13 +2,16 @@ import { Resend } from "resend";
 import {
     getOrderConfirmationTemplate,
     getOrderStatusUpdateTemplate,
-    getPasswordResetTemplate
+    getPasswordResetTemplate,
+    getEmailVerificationTemplate
 } from "../utils/emailTemplates.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const SENDER_EMAIL = "Qala <onboarding@qalaofficial.com>";
 
 const sendEmail = async ({ to, subject, html }) => {
+    if (process.env.EMAIL_TEST_MODE === "true") return;
+
     try {
         const { data, error } = await resend.emails.send({
             from: SENDER_EMAIL,
@@ -60,5 +63,14 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
         to: email,
         subject: "Password Reset Request",
         html: getPasswordResetTemplate(resetUrl)
+    });
+};
+
+export const sendEmailVerificationEmail = async (email, verificationToken) => {
+    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    await sendEmail({
+        to: email,
+        subject: "Verify your Qala email address",
+        html: getEmailVerificationTemplate(verificationUrl)
     });
 };

@@ -17,6 +17,7 @@ import WhatsAppButton from "../components/WhatsAppButton";
 import Footer from "../components/Footer";
 import { getPublicCollectionsApi } from "../features/products/api/productsApi";
 import AnnouncementBar from "../components/AnnouncementBar";
+import SEO from "../components/SEO";
 
 export default function RootLayout() {
   const dispatch = useDispatch();
@@ -95,6 +96,7 @@ export default function RootLayout() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
+      <SEO />
       {!isCheckoutPage && <AnnouncementBar />}
       <header className={`${isCheckoutPage ? "hidden" : "hidden md:block"} sticky top-0 z-60 overflow-visible border-b border-qala-bronze/30 bg-qala-cream/95 backdrop-blur-md transition-transform duration-300 ${isHeaderVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

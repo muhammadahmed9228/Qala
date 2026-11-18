@@ -8,6 +8,7 @@ import {
 } from "../api/adminApi";
 import HomeSectionForm from "../components/HomeSectionForm";
 import Pagination from "../components/Pagination";
+import Modal from "../components/Modal";
 
 export default function AdminHomeSectionsPage() {
   const [sections, setSections] = useState([]);
@@ -15,6 +16,8 @@ export default function AdminHomeSectionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // NEW: Pagination & Sorting State
   const [page, setPage] = useState(1);
@@ -116,7 +119,10 @@ export default function AdminHomeSectionsPage() {
       )}
 
       {/* NEW: Sorting & Limit Controls */}
-      <div className="flex items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm">
+      <button type="button" onClick={() => setShowFilters((open) => !open)} className="mb-3 w-full rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 md:hidden">
+        {showFilters ? "Hide Search & Filters" : "Search & Filter"}
+      </button>
+      <div className={`${showFilters ? "flex" : "hidden md:flex"} items-center justify-between rounded-lg border border-qala-champagne bg-white p-4 shadow-sm`}>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-neutral-600">Show:</label>
           <select
@@ -167,7 +173,8 @@ export default function AdminHomeSectionsPage() {
             {sections.map((section) => (
               <div
                 key={section._id}
-                className="group relative rounded-lg border border-qala-champagne bg-white p-5 shadow-sm"
+                onClick={() => setSelectedSection(section)}
+                className="group relative cursor-pointer rounded-lg border border-qala-champagne bg-white p-5 shadow-sm"
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-lg">{section.title}</h3>
@@ -207,13 +214,13 @@ export default function AdminHomeSectionsPage() {
                 {/* Hover Actions */}
                 <div className="absolute right-2 top-2 flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <button
-                    onClick={() => handleEdit(section)}
+                    onClick={(e) => { e.stopPropagation(); handleEdit(section); }}
                     className="rounded-md border border-qala-champagne bg-qala-cream p-2 text-qala-espresso shadow hover:bg-qala-champagne"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDelete(section._id)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(section._id); }}
                     className="bg-red-600 text-white p-2 rounded-md shadow hover:bg-red-700"
                   >
                     ✕
@@ -226,6 +233,27 @@ export default function AdminHomeSectionsPage() {
           <Pagination page={page} pages={totalPages} onPageChange={setPage} />
         </>
       )}
+
+      <Modal
+        isOpen={!!selectedSection}
+        onClose={() => setSelectedSection(null)}
+        title="Section Details"
+      >
+        {selectedSection && (
+          <div className="space-y-4 text-sm">
+            <div>
+              <h2 className="text-2xl font-serif font-bold text-qala-espresso">{selectedSection.title}</h2>
+              <p className="mt-2 text-neutral-600">{selectedSection.subtitle || "No subtitle provided."}</p>
+            </div>
+            <div className="space-y-2 rounded border border-qala-champagne bg-qala-champagne/20 p-4">
+              <p><strong>Criteria:</strong> {selectedSection.criteria?.toUpperCase()}</p>
+              {selectedSection.criteria === "collection" && <p><strong>Collection:</strong> {selectedSection.collectionRef?.name || "N/A"}</p>}
+              <p><strong>Display Order:</strong> {selectedSection.displayOrder}</p>
+              <p><strong>Status:</strong> {selectedSection.enabled ? "Active" : "Disabled"}</p>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

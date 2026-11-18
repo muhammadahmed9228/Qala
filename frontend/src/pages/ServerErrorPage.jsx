@@ -1,6 +1,9 @@
+import SEO from "../components/SEO";
+
 export default function ServerErrorPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-6 py-16 text-center">
+      <SEO title="Something Went Wrong | Qala" description="Qala could not complete that request." noindex />
       <div className="max-w-md">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-500">Error 500</p>
         <h1 className="mt-4 font-serif text-5xl font-bold text-neutral-900">Something went wrong</h1>

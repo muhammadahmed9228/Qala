@@ -13,6 +13,7 @@ const emptyForm = {
   discountType: "percentage",
   discountValue: "",
   minimumOrderAmount: 0,
+  maximumOrderAmount: "",
   expiryDate: "",
   isActive: true,
 };
@@ -63,6 +64,7 @@ export default function AdminCouponsPage() {
     const code = form.code.trim().toUpperCase();
     const discountValue = Number(form.discountValue);
     const minimumOrderAmount = Number(form.minimumOrderAmount);
+    const maximumOrderAmount = form.maximumOrderAmount === "" ? null : Number(form.maximumOrderAmount);
 
     if (!/^[A-Z0-9_-]{3,32}$/.test(code)) {
       toast.error("Code must be 3-32 letters, numbers, underscores, or hyphens");
@@ -70,6 +72,10 @@ export default function AdminCouponsPage() {
     }
     if (!Number.isFinite(discountValue) || discountValue <= 0) {
       toast.error("Enter a valid discount value");
+      return;
+    }
+    if (maximumOrderAmount !== null && (!Number.isFinite(maximumOrderAmount) || maximumOrderAmount < minimumOrderAmount)) {
+      toast.error("Maximum order amount must be greater than or equal to the minimum order amount");
       return;
     }
     if (form.discountType === "percentage" && discountValue > 100) {
@@ -92,6 +98,7 @@ export default function AdminCouponsPage() {
         discountType: form.discountType,
         discountValue,
         minimumOrderAmount: Number.isFinite(minimumOrderAmount) ? minimumOrderAmount : 0,
+        maximumOrderAmount,
         expiryDate: form.expiryDate,
         isActive: form.isActive,
       };
@@ -119,6 +126,7 @@ export default function AdminCouponsPage() {
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
       minimumOrderAmount: coupon.minimumOrderAmount,
+      maximumOrderAmount: coupon.maximumOrderAmount ?? "",
       expiryDate: coupon.expiryDate ? coupon.expiryDate.slice(0, 10) : "",
       isActive: Boolean(coupon.isActive),
     });
@@ -246,6 +254,21 @@ export default function AdminCouponsPage() {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">
+              Maximum Order Amount (Rs.)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="No maximum"
+              value={form.maximumOrderAmount}
+              onChange={(e) => setForm({ ...form, maximumOrderAmount: e.target.value })}
+              className="w-full rounded border border-neutral-300 px-3 py-2 text-sm focus:border-qala-bronze focus:outline-none"
+            />
+          </div>
+
           <div className="flex items-center pt-6">
             <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-neutral-700">
               <input
@@ -302,6 +325,7 @@ export default function AdminCouponsPage() {
                   <th className="p-3">Code</th>
                   <th className="p-3">Discount</th>
                   <th className="p-3">Min Order</th>
+                  <th className="p-3">Max Order</th>
                   <th className="p-3">Expires</th>
                   <th className="p-3">Status</th>
                   <th className="p-3 text-right">Actions</th>
@@ -325,6 +349,11 @@ export default function AdminCouponsPage() {
                       <td className="p-3 text-neutral-600">
                         {coupon.minimumOrderAmount > 0
                           ? `Rs. ${coupon.minimumOrderAmount.toLocaleString()}`
+                          : "None"}
+                      </td>
+                      <td className="p-3 text-neutral-600">
+                        {coupon.maximumOrderAmount != null
+                          ? `Rs. ${coupon.maximumOrderAmount.toLocaleString()}`
                           : "None"}
                       </td>
                       <td className="p-3 text-neutral-600">

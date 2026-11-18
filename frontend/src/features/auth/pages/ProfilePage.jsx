@@ -112,6 +112,8 @@ import { updateProfileApi, changePasswordApi } from "../api/authApi";
 import { getMyOrdersApi } from "../../orders/api/ordersApi";
 import { setCredentials } from "../authSlice";
 import PasswordInput from "../../../components/PasswordInput";
+import Pagination from "../../admin/components/Pagination";
+import SEO from "../../../components/SEO";
 
 export default function ProfilePage() {
   const { user } = useSelector((state) => state.auth);
@@ -127,24 +129,27 @@ export default function ProfilePage() {
   // Orders State
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPages, setOrdersPages] = useState(1);
 
   useEffect(() => {
-    if (activeTab === "orders" && orders.length === 0) {
-      fetchOrders();
-    }
-  }, [activeTab]);
+    if (activeTab !== "orders") return;
 
-  const fetchOrders = async () => {
-    setLoadingOrders(true);
-    try {
-      const response = await getMyOrdersApi();
-      setOrders(response.data);
-    } catch (error) {
-      toast.error(error.message || "Failed to load order history");
-    } finally {
-      setLoadingOrders(false);
-    }
-  };
+    const loadOrders = async () => {
+      setLoadingOrders(true);
+      try {
+        const response = await getMyOrdersApi({ page: ordersPage, limit: 10 });
+        setOrders(response.data.orders || response.data);
+        setOrdersPages(response.data.pages || 1);
+      } catch (error) {
+        toast.error(error.message || "Failed to load order history");
+      } finally {
+        setLoadingOrders(false);
+      }
+    };
+
+    loadOrders();
+  }, [activeTab, ordersPage]);
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
@@ -170,6 +175,7 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8">
+      <SEO title="My Account | Qala" description="Manage your Qala profile and order history." noindex />
       <h2 className="text-3xl font-serif font-bold mb-6">My Account</h2>
 
       {/* Tabs */}
@@ -252,6 +258,7 @@ export default function ProfilePage() {
                   onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                   placeholder="Enter new password"
                   required
+                  minLength={8}
                 />
               </div>
               <button
@@ -315,6 +322,7 @@ export default function ProfilePage() {
               </div>
             ))
           )}
+          <Pagination page={ordersPage} pages={ordersPages} onPageChange={setOrdersPage} />
         </div>
       )}
     </div>

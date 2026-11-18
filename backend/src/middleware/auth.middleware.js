@@ -12,9 +12,10 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
 
     try {
         const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-        const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
+        const user = await User.findById(decodedToken?._id)
+            .select("-password -refreshToken -refreshTokenHash");
 
-        if (!user) {
+        if (!user || decodedToken?.tokenVersion !== user.tokenVersion) {
             throw new ApiError(401, "Invalid Access Token");
         }
 
@@ -38,7 +39,8 @@ export const optionalAuth = asyncHandler(async (req, res, next) => {
     if (token) {
         try {
             const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-            const user = await User.findById(decodedToken?._id).select("-password");
+            const user = await User.findById(decodedToken?._id)
+                .select("-password -refreshToken -refreshTokenHash");
             if (user) req.user = user;
         } catch (error) {
             // Silently fail for guests with expired/invalid tokens

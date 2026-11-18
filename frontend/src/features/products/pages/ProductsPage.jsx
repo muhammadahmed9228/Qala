@@ -3,6 +3,7 @@ import { getProductsApi } from "../api/productsApi";
 import ProductCard from "../components/ProductCard";
 import { toast } from "react-toastify";
 import { useSearchParams } from "react-router-dom";
+import SEO from "../../../components/SEO";
 
 const PRODUCTS_PER_PAGE = 8;
 
@@ -101,6 +102,11 @@ export default function ProductsPage() {
 
   return (
     <div className="py-8">
+      <SEO
+        title="Shop Eastern Wear | Qala"
+        description="Explore Qala's collection of refined Eastern wear, timeless silhouettes, and contemporary handcrafted styles."
+        canonicalPath="/products"
+      />
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <h2 className="text-3xl font-serif font-bold">All Products</h2>
 

@@ -1,6 +1,8 @@
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
+import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
 import { Order } from "./order.model.js";
 import { Product } from "../products/product.model.js";
 import {
@@ -10,9 +12,24 @@ import {
 } from "../../services/email.service.js";
 import axios from "axios";
 import { validateCoupon } from "../coupons/coupon.service.js";
+import { getShippingOption, getShippingOptions as listShippingOptions } from "./shipping.config.js";
+import { getPagination } from "../../utils/pagination.js";
+
+export const getShippingOptions = asyncHandler(async (req, res) => {
+    return res.status(200).json(new ApiResponse(200, listShippingOptions(), "Shipping options fetched successfully"));
+});
 
 export const createOrder = asyncHandler(async (req, res) => {
-    const { customerInfo, shippingInfo, items, turnstileToken, couponCode, paymentMethod } = req.body;
+    const { customerInfo, shippingInfo, billingInfo, items, turnstileToken, couponCode, paymentMethod, termsAccepted, shippingMethod, idempotencyKey } = req.body;
+
+    // Return an already-created order before re-validating a one-time Turnstile
+    // token. This makes safe client retries possible after a network timeout.
+    if (idempotencyKey) {
+        const existingOrder = await Order.findOne({ idempotencyKey });
+        if (existingOrder) {
+            return res.status(200).json(new ApiResponse(200, existingOrder, "Order already placed"));
+        }
+    }
 
     if (!turnstileToken) {
         return res.status(400).json({ message: "Security token is missing." });
@@ -34,13 +51,33 @@ export const createOrder = asyncHandler(async (req, res) => {
     if (!items || items.length === 0) {
         throw new ApiError(400, "Order items cannot be empty");
     }
+    if (!termsAccepted) {
+        throw new ApiError(400, "Terms & Conditions must be accepted before placing an order");
+    }
+    if (!customerInfo?.name?.trim() || !customerInfo?.email?.trim() || !customerInfo?.phone?.trim()) {
+        throw new ApiError(400, "Name, email, and phone are required");
+    }
+    if (!shippingInfo?.address?.trim() || !shippingInfo?.city?.trim()) {
+        throw new ApiError(400, "A complete shipping address is required");
+    }
+    if (!billingInfo?.address?.trim() || !billingInfo?.city?.trim()) {
+        throw new ApiError(400, "A complete billing address is required");
+    }
+
+    const selectedShipping = getShippingOption(shippingMethod?.code || shippingMethod || "flat_rate");
+    if (!selectedShipping) {
+        throw new ApiError(400, "Selected shipping method is not available");
+    }
 
     let calculatedSubtotal = 0;
     const orderItemsSnapshot = [];
+    const productIds = [...new Set(items.map((item) => String(item.productId)))];
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productsById = new Map(products.map((product) => [product._id.toString(), product]));
 
     // 1. Authoritative Backend Price Calculation & Stock Verification
     for (const item of items) {
-        const product = await Product.findById(item.productId);
+        const product = productsById.get(String(item.productId));
         if (!product) throw new ApiError(404, `Product ${item.name} not found`);
 
         const variant = product.variants.find(v => v.colorName === item.color);
@@ -87,11 +124,13 @@ export const createOrder = asyncHandler(async (req, res) => {
     let discountAmount = 0;
     let appliedCoupon = null;
 
+    const normalizedCustomerEmail = customerInfo.email.trim().toLowerCase();
+
     if (couponCode) {
         try {
             // NEW: Enforce one-time use of coupon per email address
             const previousOrder = await Order.findOne({
-                "customerInfo.email": { $regex: new RegExp(`^${customerInfo.email}$`, "i") },
+                "customerInfo.email": normalizedCustomerEmail,
                 "coupon.code": couponCode.toUpperCase(),
                 status: { $ne: "Cancelled" }
             });
@@ -113,62 +152,116 @@ export const createOrder = asyncHandler(async (req, res) => {
         }
     }
 
-    const shippingCost = 250;
+    const shippingCost = selectedShipping.cost;
     
     // NEW: Apply Rs 100 bank transfer discount
     if (paymentMethod === "BANK_TRANSFER") {
         discountAmount += 100;
     }
 
-    const total = calculatedSubtotal - discountAmount + shippingCost;
+    const total = Math.max(0, calculatedSubtotal - discountAmount) + shippingCost;
 
-    // 2. Stock Deduction
-    for (const item of orderItemsSnapshot) {
-        if (item.size === "CUSTOM") {
-            // Custom sizes are made-to-order, so we only increment the global sales counter
-            await Product.updateOne(
-                { _id: item.productId },
-                { $inc: { "soldCount": item.quantity } }
-            );
-        } else {
-            // Standard size deduction
-            await Product.updateOne(
-                { _id: item.productId },
-                {
-                    $inc:
+    // 2. Atomic stock deduction and order creation. A conditional update prevents
+    // concurrent checkouts from taking the same remaining units.
+    const orderNumber = `Q-${Date.now().toString().slice(-6)}-${randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
+    const deductedItems = [];
+    let order;
+
+    try {
+        for (const item of orderItemsSnapshot) {
+            if (item.size === "CUSTOM") {
+                await Product.updateOne(
+                    { _id: item.productId },
+                    { $inc: { soldCount: item.quantity } }
+                );
+            } else {
+                const result = await Product.updateOne(
                     {
-                        "variants.$[v].sizes.$[s].stock": -item.quantity,
-                        "soldCount": item.quantity
-                    }
-                },
-                { arrayFilters: [{ "v.colorName": item.color }, { "s.sku": item.sku }] }
-            );
+                        _id: item.productId,
+                        variants: {
+                            $elemMatch: {
+                                colorName: item.color,
+                                sizes: { $elemMatch: { sku: item.sku, stock: { $gte: item.quantity } } }
+                            }
+                        }
+                    },
+                    {
+                        $inc: {
+                            "variants.$[v].sizes.$[s].stock": -item.quantity,
+                            soldCount: item.quantity
+                        }
+                    },
+                    { arrayFilters: [{ "v.colorName": item.color }, { "s.sku": item.sku }] }
+                );
+                if (result.modifiedCount !== 1) {
+                    throw new ApiError(400, `Stock changed before checkout completed for ${item.name} (${item.size}). Please review your cart.`);
+                }
+            }
+            deductedItems.push(item);
         }
+
+        order = await Order.create({
+            orderNumber,
+            ...(idempotencyKey ? { idempotencyKey } : {}),
+            userRef: req.user?._id || null,
+            customerInfo: {
+                name: customerInfo.name.trim(),
+                email: normalizedCustomerEmail,
+                phone: customerInfo.phone.trim()
+            },
+            shippingInfo: {
+                address: shippingInfo.address.trim(),
+                city: shippingInfo.city.trim(),
+                postalCode: shippingInfo?.postalCode || "",
+                country: shippingInfo?.country || "Pakistan",
+                notes: shippingInfo?.notes || ""
+            },
+            billingInfo: {
+                address: billingInfo.address.trim(),
+                city: billingInfo.city.trim(),
+                postalCode: billingInfo.postalCode || "",
+                country: billingInfo.country || "Pakistan",
+                phone: billingInfo.phone || customerInfo.phone
+            },
+            shippingMethod: selectedShipping,
+            items: orderItemsSnapshot,
+            pricing: {
+                subtotal: calculatedSubtotal,
+                discount: discountAmount,
+                shippingCost,
+                total
+            },
+            coupon: appliedCoupon,
+            paymentMethod: paymentMethod || "COD",
+            termsAccepted: true,
+            termsAcceptedAt: new Date()
+        });
+    } catch (error) {
+        for (const item of deductedItems) {
+            if (item.size === "CUSTOM") {
+                await Product.updateOne({ _id: item.productId }, { $inc: { soldCount: -item.quantity } });
+            } else {
+                await Product.updateOne(
+                    { _id: item.productId },
+                    {
+                        $inc: {
+                            "variants.$[v].sizes.$[s].stock": item.quantity,
+                            soldCount: -item.quantity
+                        }
+                    },
+                    { arrayFilters: [{ "v.colorName": item.color }, { "s.sku": item.sku }] }
+                );
+            }
+        }
+        if (error?.code === 11000 && idempotencyKey) {
+            const existingOrder = await Order.findOne({ idempotencyKey });
+            if (existingOrder) return res.status(200).json(new ApiResponse(200, existingOrder, "Order already placed"));
+        }
+        if (error?.code === 11000 && error?.keyPattern?.["customerInfo.email"] && error?.keyPattern?.["coupon.code"]) {
+            throw new ApiError(400, "You have already used this coupon code.");
+        }
+        throw error;
     }
-
-    // 3. Order Creation
-    const orderNumber = `Q-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-
-    const order = await Order.create({
-        orderNumber,
-        userRef: req.user?._id || null, // Associates with account if logged in via optionalAuth
-        customerInfo,
-        shippingInfo: {
-            address: shippingInfo?.address,
-            city: shippingInfo?.city,
-            postalCode: shippingInfo?.postalCode || "",
-            notes: shippingInfo?.notes || ""
-        },
-        items: orderItemsSnapshot,
-        pricing: {
-            subtotal: calculatedSubtotal,
-            discount: discountAmount,
-            shippingCost,
-            total
-        },
-        coupon: appliedCoupon,
-        paymentMethod: paymentMethod || "COD"
-    });
 
     //PHASE 12: Fire off emails asynchronously and in parallel
     try {
@@ -185,8 +278,19 @@ export const createOrder = asyncHandler(async (req, res) => {
 
 export const getMyOrders = asyncHandler(async (req, res) => {
     // req.user is guaranteed by verifyJWT
-    const orders = await Order.find({ userRef: req.user._id }).sort({ createdAt: -1 });
-    return res.status(200).json(new ApiResponse(200, orders, "Orders fetched successfully"));
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const filter = { userRef: req.user._id };
+    const [orders, total] = await Promise.all([
+        Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Order.countDocuments(filter)
+    ]);
+
+    return res.status(200).json(new ApiResponse(200, {
+        orders,
+        total,
+        page,
+        pages: Math.ceil(total / limit)
+    }, "Orders fetched successfully"));
 });
 
 export const getOrderById = asyncHandler(async (req, res) => {
@@ -202,7 +306,8 @@ export const getOrderById = asyncHandler(async (req, res) => {
 });
 
 export const getAllOrders = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, sort = "newest", status, search, dateRange, dateFrom, dateTo } = req.query;
+    const { sort = "newest", status, search, dateRange, dateFrom, dateTo } = req.query;
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
 
     // Base query
     const baseQuery = req.user.role === "admin" ? {} : { customer: req.user._id };
@@ -271,8 +376,6 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     const query = { ...baseQuery };
     if (status) query.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
-
     let sortOptions = { createdAt: -1 };
     if (sort === "oldest") sortOptions = { createdAt: 1 };
     if (sort === "amount_high") sortOptions = { "pricing.total": -1 };
@@ -281,7 +384,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     const orders = await Order.find(query)
         .sort(sortOptions)
         .skip(skip)
-        .limit(Number(limit));
+        .limit(limit);
 
     const total = await Order.countDocuments(query);
 
@@ -289,8 +392,8 @@ export const getAllOrders = asyncHandler(async (req, res) => {
         orders,
         total,
         statusCounts, // <-- Sending the calculated counts to the frontend
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit))
+        page,
+        pages: Math.ceil(total / limit)
     }, "Orders fetched successfully"));
 });
 
@@ -302,16 +405,64 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid status provided");
     }
 
-    const order = await Order.findById(req.params.id);
+    const session = await mongoose.startSession();
+    let order;
 
-    if (!order) throw new ApiError(404, "Order not found");
+    try {
+        await session.withTransaction(async () => {
+            order = await Order.findById(req.params.id).session(session);
 
-    if (["Delivered", "Cancelled"].includes(order.status) && order.status !== status) {
-        throw new ApiError(400, `Cannot change a ${order.status.toLowerCase()} order status`);
+            if (!order) throw new ApiError(404, "Order not found");
+
+            if (["Delivered", "Cancelled"].includes(order.status) && order.status !== status) {
+                throw new ApiError(400, `Cannot change a ${order.status.toLowerCase()} order status`);
+            }
+
+            if (status === "Cancelled" && !order.inventoryRestoredAt) {
+                for (const item of order.items) {
+                    let result;
+                    if (item.size === "CUSTOM") {
+                        result = await Product.updateOne(
+                            { _id: item.productId },
+                            { $inc: { soldCount: -item.quantity } },
+                            { session }
+                        );
+                    } else {
+                        result = await Product.updateOne(
+                            { _id: item.productId },
+                            {
+                                $inc: {
+                                    "variants.$[v].sizes.$[s].stock": item.quantity,
+                                    soldCount: -item.quantity
+                                }
+                            },
+                            {
+                                session,
+                                arrayFilters: [{ "v.colorName": item.color }, { "s.sku": item.sku }]
+                            }
+                        );
+                    }
+
+                    if (result.modifiedCount !== 1) {
+                        throw new ApiError(409, `Inventory could not be restored for ${item.name} (${item.size})`);
+                    }
+                }
+                order.inventoryRestoredAt = new Date();
+            }
+
+            order.status = status;
+            order.fulfillment = order.fulfillment || {};
+            if (status === "Shipped" && !order.fulfillment?.shippedAt) {
+                order.fulfillment.shippedAt = new Date();
+            }
+            if (status === "Delivered" && !order.fulfillment?.deliveredAt) {
+                order.fulfillment.deliveredAt = new Date();
+            }
+            await order.save({ session });
+        });
+    } finally {
+        await session.endSession();
     }
-
-    order.status = status;
-    await order.save();
 
 
     //PHASE 12: Trigger status email
@@ -321,6 +472,29 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         console.error("Status email dispatch failed:", error);
     }
     return res.status(200).json(new ApiResponse(200, order, "Order status updated successfully"));
+});
+
+export const updateOrderFulfillment = asyncHandler(async (req, res) => {
+    const { courier = "", trackingNumber = "", internalNotes = "", shippedAt = null, deliveredAt = null } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) throw new ApiError(404, "Order not found");
+
+    const parseDate = (value, label) => {
+        if (!value) return null;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) throw new ApiError(400, `Invalid ${label}`);
+        return date;
+    };
+
+    order.fulfillment = {
+        courier: String(courier).trim().slice(0, 120),
+        trackingNumber: String(trackingNumber).trim().slice(0, 120),
+        internalNotes: String(internalNotes).trim().slice(0, 1000),
+        shippedAt: parseDate(shippedAt, "shipped date"),
+        deliveredAt: parseDate(deliveredAt, "delivered date")
+    };
+    await order.save();
+    return res.status(200).json(new ApiResponse(200, order, "Fulfillment details updated successfully"));
 });
 
 export const deleteOrder = asyncHandler(async (req, res) => {

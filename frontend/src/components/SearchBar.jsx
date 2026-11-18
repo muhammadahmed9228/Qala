@@ -36,16 +36,18 @@ export default function SearchBar({ isAdmin = false, onClose }) {
       setIsOpen(true);
       
       try {
-        let pRes, cRes;
-        
-        // Use different APIs based on if this is mounted in the Admin Panel or Public Site
-        if (isAdmin) {
-           pRes = await getAdminProductsApi({ search: query, limit: 5 });
-           cRes = await getAdminCollectionsApi({ limit: 100 }); // Fetch all to filter locally
-        } else {
-           pRes = await getProductsApi({ search: query, limit: 5 });
-           cRes = await getPublicCollectionsApi({ limit: 100 });
-        }
+        // Use different APIs based on if this is mounted in the Admin Panel or Public Site.
+        // These are independent lookups, so keep them parallel to avoid adding
+        // the collection request behind the product request latency.
+        const [pRes, cRes] = isAdmin
+          ? await Promise.all([
+              getAdminProductsApi({ search: query, limit: 5 }),
+              getAdminCollectionsApi({ limit: 100 }),
+            ])
+          : await Promise.all([
+              getProductsApi({ search: query, limit: 5 }),
+              getPublicCollectionsApi({ limit: 100 }),
+            ]);
 
         const productsData = pRes.data.products || pRes.data || [];
         const collectionsData = cRes.data.collections || cRes.data || [];
@@ -56,7 +58,7 @@ export default function SearchBar({ isAdmin = false, onClose }) {
         ).slice(0, 3); // Max 3 collections in dropdown
 
         setResults({ products: productsData, collections: matchedCollections });
-      } catch (error) {
+      } catch {
         console.error("Search failed");
       } finally {
         setLoading(false);

@@ -3,6 +3,8 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { Product } from "./product.model.js";
+import { getPagination } from "../../utils/pagination.js";
+import { pickAllowedFields } from "../../utils/pickAllowedFields.js";
 
 const BRAND_SKU_ABBR = "Q";
 
@@ -13,7 +15,7 @@ const generateAbbreviation = (text, length = 3) => {
 };
 
 // Helper: Builds the smart SKU and ensures 100% uniqueness
-const generateSmartSku = async (baseDetails, color, size, localSkus) => {
+const generateSmartSku = async (baseDetails, color, size, localSkus, existingSkus) => {
     const { brandAbbr, collectionAbbr, categoryAbbr } = baseDetails;
     const colorAbbr = generateAbbreviation(color, 3);
     const sizeAbbr = generateAbbreviation(size, 3);
@@ -26,14 +28,11 @@ const generateSmartSku = async (baseDetails, color, size, localSkus) => {
     const baseSku = segments.filter(Boolean).join("-");
     let finalSku = baseSku;
 
-    const Product = mongoose.model("Product");
     let isUnique = false;
     
     while (!isUnique) {
-        // Check if SKU exists in the database OR in the current request payload
-        const existsInDb = await Product.exists({ "variants.sizes.sku": finalSku });
-        
-        if (existsInDb || localSkus.has(finalSku)) {
+        // Check the prefetched database set OR the current request payload.
+        if (existingSkus.has(finalSku) || localSkus.has(finalSku)) {
             // Append 3 random digits to guarantee uniqueness on collision
             const randomDigits = Math.floor(100 + Math.random() * 900);
             finalSku = `${baseSku}-${randomDigits}`;
@@ -100,6 +99,7 @@ export const createProduct = asyncHandler(async (req, res) => {
         const categoryAbbr = generateAbbreviation(category, 3);
         const baseDetails = { brandAbbr, collectionAbbr, categoryAbbr };
         const localSkus = new Set(); // Tracks SKUs in this specific request
+        const existingSkus = new Set(await Product.distinct("variants.sizes.sku"));
 
         for (const variant of variants) {
             // 1. Image Limit Validation
@@ -112,7 +112,7 @@ export const createProduct = asyncHandler(async (req, res) => {
                 for (const size of variant.sizes) {
                     // Only generate if SKU is missing or looks like generic user input (lacks dashes)
                     if (!size.sku || !size.sku.includes("-")) {
-                        size.sku = await generateSmartSku(baseDetails, variant.colorName, size.size, localSkus);
+                        size.sku = await generateSmartSku(baseDetails, variant.colorName, size.size, localSkus, existingSkus);
                     } else {
                         // Register existing valid SKU to prevent accidental collisions in the loop
                         localSkus.add(size.sku); 
@@ -128,7 +128,8 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const getAllProducts = asyncHandler(async (req, res) => {
-    const { search, collection, featured, published, stock, sort, dateRange, dateFrom, dateTo, page = 1, limit = 10 } = req.query;
+    const { search, collection, featured, published, stock, sort, dateRange, dateFrom, dateTo } = req.query;
+    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
     const isAdmin = req.user && req.user.role === "admin";
     
     const baseQuery = isAdmin ? { isDeleted: { $ne: true } } : { published: true, isDeleted: { $ne: true } };
@@ -201,8 +202,6 @@ export const getAllProducts = asyncHandler(async (req, res) => {
         else query.collectionRef = collection;
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-
     let sortOptions = { createdAt: -1 };
     if (sort === "price_asc") sortOptions = { basePrice: 1 };
     else if (sort === "price_desc") sortOptions = { basePrice: -1 };
@@ -213,7 +212,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
         .populate("collectionRef", "name slug")
         .sort(sortOptions)
         .skip(skip)
-        .limit(Number(limit));
+        .limit(limit);
 
     const total = await Product.countDocuments(query);
 
@@ -221,8 +220,8 @@ export const getAllProducts = asyncHandler(async (req, res) => {
         products,
         total,
         collectionCounts, // <-- Sending the calculated counts to the frontend
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit))
+        page,
+        pages: Math.ceil(total / limit)
     }, "Products fetched successfully"));
 });
 
@@ -256,6 +255,7 @@ export const updateProductById = asyncHandler(async (req, res) => {
         const categoryAbbr = generateAbbreviation(category, 3);
         const baseDetails = { brandAbbr, collectionAbbr, categoryAbbr };
         const localSkus = new Set();
+        const existingSkus = new Set(await Product.distinct("variants.sizes.sku"));
 
         for (const variant of variants) {
             // 1. Image Limit Validation
@@ -267,7 +267,7 @@ export const updateProductById = asyncHandler(async (req, res) => {
             if (variant.sizes && Array.isArray(variant.sizes)) {
                 for (const size of variant.sizes) {
                     if (!size.sku || !size.sku.includes("-")) {
-                        size.sku = await generateSmartSku(baseDetails, variant.colorName, size.size, localSkus);
+                        size.sku = await generateSmartSku(baseDetails, variant.colorName, size.size, localSkus, existingSkus);
                     } else {
                         localSkus.add(size.sku);
                     }
@@ -276,9 +276,24 @@ export const updateProductById = asyncHandler(async (req, res) => {
         }
     }
 
+    const updates = pickAllowedFields(req.body, [
+        "name",
+        "slug",
+        "description",
+        "basePrice",
+        "discount",
+        "collectionRef",
+        "published",
+        "isFeatured",
+        "thumbnail",
+        "sizeChartImage",
+        "customSizing",
+        "variants"
+    ]);
+
     const product = await Product.findByIdAndUpdate(
         req.params.id,
-        { $set: req.body },
+        { $set: updates },
         { new: true, runValidators: true }
     );
     

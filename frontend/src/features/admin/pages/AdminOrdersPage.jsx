@@ -5,14 +5,18 @@ import {
   updateOrderStatusApi,
   getAdminCollectionsApi,
   deleteOrderApi,
+  updateOrderFulfillmentApi,
 } from "../api/adminApi";
 import Modal from "../components/Modal";
 import Pagination from "../components/Pagination";
+import ActionIcon from "../components/ActionIcon";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [fulfillmentSaving, setFulfillmentSaving] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // NEW: Pagination & Sorting State
   const [page, setPage] = useState(1);
@@ -120,6 +124,29 @@ const [search, setSearch] = useState("");
     }
   };
 
+  const updateFulfillmentField = (field, value) => {
+    setSelectedOrder((current) => current ? {
+      ...current,
+      fulfillment: { ...(current.fulfillment || {}), [field]: value }
+    } : current);
+  };
+
+  const handleFulfillmentSave = async () => {
+    if (!selectedOrder) return;
+    setFulfillmentSaving(true);
+    try {
+      const fulfillment = selectedOrder.fulfillment || {};
+      const response = await updateOrderFulfillmentApi(selectedOrder._id, fulfillment);
+      setSelectedOrder(response.data);
+      setOrders((current) => current.map((order) => order._id === response.data._id ? response.data : order));
+      toast.success("Fulfillment details updated");
+    } catch (error) {
+      toast.error(error.message || "Failed to update fulfillment details");
+    } finally {
+      setFulfillmentSaving(false);
+    }
+  };
+
   if (loading)
     return <div className="py-10 text-center">Loading orders...</div>;
 
@@ -147,7 +174,10 @@ const [search, setSearch] = useState("");
       )}
       
       {/* NEW: Search & Sorting Controls */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4">
+      <button type="button" onClick={() => setShowFilters((open) => !open)} className="mb-3 w-full rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 md:hidden">
+        {showFilters ? "Hide Search & Filters" : "Search & Filter"}
+      </button>
+      <div className={`${showFilters ? "flex" : "hidden md:flex"} flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4`}>
         
         {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="flex w-full lg:w-auto flex-1 max-w-md">
@@ -251,21 +281,21 @@ const [search, setSearch] = useState("");
                   <th className="px-6 py-3 font-medium text-neutral-500">
                     Status
                   </th>
+                  <th className="px-6 py-3 font-medium text-neutral-500">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200">
                 {orders.map((order) => (
-                  <tr key={order._id} className="hover:bg-neutral-50">
+                  <tr key={order._id} onClick={() => setSelectedOrder(order)} className="cursor-pointer hover:bg-neutral-50">
                     <td className="px-6 py-4 font-medium">
                       {order.orderNumber}
-                      <button
-                        onClick={() => setSelectedOrder(order)}
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}
                         className="block text-xs text-indigo-600 hover:underline mt-1"
                       >
-                        View Details
+                        <ActionIcon type="view" label="View Details" />
                       </button>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       <p>{order.customerInfo.name}</p>
                       <p className="text-xs text-neutral-500">
                         {order.customerInfo.email}
@@ -293,9 +323,9 @@ const [search, setSearch] = useState("");
                       </div>
                     </td>
                     <td className="px-6 py-4 text-neutral-500">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                      {new Date(order.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={order.status}
                         disabled={order.status === "Delivered" || order.status === "Cancelled"}
@@ -311,11 +341,10 @@ const [search, setSearch] = useState("");
                         <option value="Delivered">Delivered</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
-                      <button
-                        onClick={() => handleDelete(order._id)}
-                        className="text-red-600 hover:underline text-xs text-left mt-1"
-                      >
-                        Delete Order
+                    </td>
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => handleDelete(order._id)} className="text-red-600 hover:underline text-xs text-left">
+                        <ActionIcon type="delete" label="Delete Order" />
                       </button>
                     </td>
                   </tr>
@@ -358,12 +387,94 @@ const [search, setSearch] = useState("");
                   {selectedOrder.shippingInfo.city}
                   {selectedOrder.shippingInfo.postalCode ? `, ${selectedOrder.shippingInfo.postalCode}` : ""}
                 </p>
+                <p className="mt-2 text-neutral-600">
+                  Method: {selectedOrder.shippingMethod?.name || "Standard Delivery"}
+                  {selectedOrder.pricing?.shippingCost != null && ` — Rs. ${selectedOrder.pricing.shippingCost.toLocaleString()}`}
+                </p>
+                {selectedOrder.shippingMethod?.minDays != null && (
+                  <p className="text-xs text-neutral-500">
+                    Estimate: {selectedOrder.shippingMethod.minDays}–{selectedOrder.shippingMethod.maxDays} business days
+                  </p>
+                )}
                 {selectedOrder.shippingInfo.notes && (
                   <p className="mt-2 text-neutral-500 italic">
                     Note: {selectedOrder.shippingInfo.notes}
                   </p>
                 )}
               </div>
+              <div className="bg-neutral-50 p-4 rounded border border-neutral-200">
+                <h4 className="font-bold border-b pb-2 mb-3">Billing Info</h4>
+                {selectedOrder.billingInfo?.address ? (
+                  <>
+                    <p>{selectedOrder.billingInfo.address}</p>
+                    <p>
+                      {selectedOrder.billingInfo.city}
+                      {selectedOrder.billingInfo.postalCode ? `, ${selectedOrder.billingInfo.postalCode}` : ""}
+                    </p>
+                    {selectedOrder.billingInfo.phone && <p>Phone: {selectedOrder.billingInfo.phone}</p>}
+                  </>
+                ) : (
+                  <p className="text-neutral-500">Same as shipping address / not recorded on this order.</p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-500">
+              Terms & Conditions: {selectedOrder.termsAccepted ? "Accepted" : "Not recorded on this order"}
+              {selectedOrder.termsAcceptedAt && ` on ${new Date(selectedOrder.termsAcceptedAt).toLocaleString()}`}
+              {selectedOrder.inventoryRestoredAt && ` · Inventory restored on ${new Date(selectedOrder.inventoryRestoredAt).toLocaleString()}`}
+            </p>
+
+            <div className="rounded border border-neutral-200 bg-white p-4">
+              <h4 className="mb-3 border-b pb-2 font-bold">Fulfillment</h4>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  type="text"
+                  placeholder="Courier / delivery partner"
+                  value={selectedOrder.fulfillment?.courier || ""}
+                  onChange={(e) => updateFulfillmentField("courier", e.target.value)}
+                  className="rounded border border-neutral-300 px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Tracking number"
+                  value={selectedOrder.fulfillment?.trackingNumber || ""}
+                  onChange={(e) => updateFulfillmentField("trackingNumber", e.target.value)}
+                  className="rounded border border-neutral-300 px-3 py-2 text-sm"
+                />
+                <label className="text-xs text-neutral-500">
+                  Shipped at
+                  <input
+                    type="datetime-local"
+                    value={selectedOrder.fulfillment?.shippedAt ? new Date(selectedOrder.fulfillment.shippedAt).toISOString().slice(0, 16) : ""}
+                    onChange={(e) => updateFulfillmentField("shippedAt", e.target.value)}
+                    className="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                </label>
+                <label className="text-xs text-neutral-500">
+                  Delivered at
+                  <input
+                    type="datetime-local"
+                    value={selectedOrder.fulfillment?.deliveredAt ? new Date(selectedOrder.fulfillment.deliveredAt).toISOString().slice(0, 16) : ""}
+                    onChange={(e) => updateFulfillmentField("deliveredAt", e.target.value)}
+                    className="mt-1 block w-full rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-900"
+                  />
+                </label>
+              </div>
+              <textarea
+                placeholder="Internal fulfillment notes"
+                value={selectedOrder.fulfillment?.internalNotes || ""}
+                onChange={(e) => updateFulfillmentField("internalNotes", e.target.value)}
+                className="mt-3 min-h-20 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleFulfillmentSave}
+                disabled={fulfillmentSaving}
+                className="mt-3 rounded bg-qala-espresso px-4 py-2 text-sm font-semibold text-white hover:bg-qala-bronze disabled:opacity-50"
+              >
+                {fulfillmentSaving ? "Saving..." : "Save Fulfillment"}
+              </button>
             </div>
 
             <div>

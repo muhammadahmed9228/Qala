@@ -139,6 +139,10 @@ const productSchema = new Schema(
 );
 
 productSchema.index({ published: 1, featured: 1 });
+productSchema.index({ published: 1, isDeleted: 1, createdAt: -1 });
+productSchema.index({ published: 1, isDeleted: 1, soldCount: -1 });
+productSchema.index({ published: 1, isDeleted: 1, isFeatured: 1, createdAt: -1 });
+productSchema.index({ published: 1, isDeleted: 1, collectionRef: 1, createdAt: -1 });
 productSchema.index({ collectionRef: 1 });
 
 export const Product = mongoose.model("Product", productSchema);

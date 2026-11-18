@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { clearCart } from "../../cart/cartSlice";
+import { clearCart, removeFromCart } from "../../cart/cartSlice";
 import { toggleCart } from "../../cart/cartSlice";
 import { calculateItemPrice } from "../../cart/cartPricing";
-import { createOrderApi, validateCouponApi } from "../api/checkoutApi";
+import { createOrderApi, getShippingOptionsApi, validateCouponApi } from "../api/checkoutApi";
 import logoImg from "../../../assets/logo.jpeg";
 import { Turnstile } from '@marsidev/react-turnstile';
 import { applyCoupon, removeCoupon } from "../../cart/cartSlice";
+import DeleteIcon from "../../../components/DeleteIcon";
+import SEO from "../../../components/SEO";
 
 export default function CheckoutPage() {
   const { items, coupon } = useSelector((state) => state.cart);
@@ -21,6 +23,7 @@ export default function CheckoutPage() {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
+    lastName: "",
     email: "",
     phone: "",
     address: "",
@@ -33,17 +36,50 @@ export default function CheckoutPage() {
     paymentMethod: "COD",
     billingOption: "same",
     billingAddress: {
+      firstName: "",
+      lastName: "",
       address: "",
       apartment: "",
       city: "",
       postalCode: "",
       country: "Pakistan",
+      phone: "",
     },
     notes: "",
+    termsAccepted: false,
   });
   const [couponInput, setCouponInput] = useState("");
   const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
   const [isMobileSummaryExpanded, setIsMobileSummaryExpanded] = useState(false);
+  const [shippingOptions, setShippingOptions] = useState([]);
+  const [shippingLoading, setShippingLoading] = useState(true);
+  const [isBankNumberCopied, setIsBankNumberCopied] = useState(false);
+  const idempotencyKeyRef = useRef(null);
+  const copyTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    getShippingOptionsApi()
+      .then((response) => {
+        if (active) setShippingOptions(response.data || []);
+      })
+      .catch((error) => {
+        if (active) toast.error(error.message || "Unable to load shipping options");
+      })
+      .finally(() => {
+        if (active) setShippingLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => () => {
+    if (copyTimeoutRef.current) {
+      window.clearTimeout(copyTimeoutRef.current);
+    }
+  }, []);
 
   // Pre-fill customer data if logged in
   useEffect(() => {
@@ -74,7 +110,8 @@ export default function CheckoutPage() {
     }
   }
 
-  const shippingCost = 250; // Fixed flat rate for V1 COD as defined in backend
+  const shippingOption = shippingOptions[0];
+  const shippingCost = shippingOption?.cost ?? 0;
   
   let paymentDiscount = 0;
   if (formData.paymentMethod === "BANK_TRANSFER") {
@@ -98,7 +135,7 @@ export default function CheckoutPage() {
       setCouponInput("");
       toast.success("Coupon applied successfully!");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Invalid coupon code");
+      toast.error(error.message || error.data?.message || "Invalid coupon code");
     } finally {
       setIsValidatingCoupon(false);
     }
@@ -121,30 +158,118 @@ export default function CheckoutPage() {
     });
   };
 
+  const handleCopyBankNumber = async () => {
+    const bankContactNumber = "03322363113";
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(bankContactNumber);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = bankContactNumber;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const copied = document.execCommand("copy");
+        textArea.remove();
+
+        if (!copied) {
+          throw new Error("Copy command failed");
+        }
+      }
+
+      setIsBankNumberCopied(true);
+      toast.success("Number copied to clipboard");
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setIsBankNumberCopied(false);
+      }, 2000);
+    } catch {
+      toast.error("Unable to copy number");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const customerName = [formData.name, formData.lastName].map((value) => value.trim()).filter(Boolean).join(" ");
+    if (customerName.length < 2) {
+      toast.error("Please enter your full name.");
+      return;
+    }
+    if (!formData.email.trim()) {
+      toast.error("Please enter your email address.");
+      return;
+    }
+    if (!/^[+\d][\d\s().-]{6,}$/.test(formData.phone.trim())) {
+      toast.error("Please enter a valid phone number.");
+      return;
+    }
+    if (!formData.address.trim() || !formData.city.trim()) {
+      toast.error("Please complete your shipping address.");
+      return;
+    }
+    if (formData.billingOption === "different" && (!formData.billingAddress.address.trim() || !formData.billingAddress.city.trim())) {
+      toast.error("Please complete your billing address.");
+      return;
+    }
+    if (!formData.termsAccepted) {
+      toast.error("Please agree to the Terms & Conditions before completing your order.");
+      return;
+    }
+    if (shippingLoading || !shippingOption) {
+      toast.error("Shipping options are still loading. Please try again shortly.");
+      return;
+    }
     if (!turnstileToken) {
       toast.error("Please complete the security check.");
       return;
     }
     setSubmitting(true);
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    }
 
     const payload = {
       customerInfo: {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
+        name: customerName,
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
       },
       shippingInfo: {
         address: formData.address + (formData.apartment ? ` ${formData.apartment}` : ""),
         city: formData.city,
         postalCode: formData.postalCode,
+        country: formData.country,
         notes: formData.notes,
       },
+      shippingMethod: shippingOption.code,
+      billingInfo: formData.billingOption === "same"
+        ? {
+            address: formData.address + (formData.apartment ? ` ${formData.apartment}` : ""),
+            city: formData.city,
+            postalCode: formData.postalCode,
+            country: formData.country,
+            phone: formData.phone.trim(),
+          }
+        : {
+            address: formData.billingAddress.address.trim() + (formData.billingAddress.apartment ? ` ${formData.billingAddress.apartment.trim()}` : ""),
+            city: formData.billingAddress.city.trim(),
+            postalCode: formData.billingAddress.postalCode.trim(),
+            country: formData.billingAddress.country,
+            phone: formData.billingAddress.phone.trim(),
+          },
       items: items, // Redux cart items already match the required structure
       turnstileToken,
       couponCode: coupon?.code || null,
       paymentMethod: formData.paymentMethod,
+      termsAccepted: formData.termsAccepted,
+      idempotencyKey: idempotencyKeyRef.current,
     };
 
     try {
@@ -166,6 +291,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-qala-cream">
+      <SEO title="Checkout | Qala" description="Complete your Qala order securely with delivery and payment details." noindex />
       <header className="sticky top-0 z-40 border-b border-qala-champagne bg-qala-cream/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link to="/" aria-label="Qala home" className="flex items-center gap-2">
@@ -227,7 +353,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input type="text" placeholder="First name (optional)" name="name" value={formData.name} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
-                  <input type="text" placeholder="Last name" name="lastName" className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
+                  <input type="text" placeholder="Last name" name="lastName" value={formData.lastName} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
                 </div>
                 <div>
                   <input type="text" placeholder="Address" name="address" required value={formData.address} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
@@ -252,9 +378,12 @@ export default function CheckoutPage() {
             {/* Shipping method */}
             <div className="mt-8">
               <h3 className="text-xl font-semibold mb-4">Shipping method</h3>
-              <div className="bg-neutral-50 p-4 border border-qala-bronze/50 rounded-md flex justify-between items-center bg-blue-50/30">
-                <span className="text-sm text-neutral-700">Flat Rate</span>
-                <span className="text-sm font-semibold">Rs 250.00</span>
+              <div className="bg-neutral-50 p-4 border border-qala-bronze/50 rounded-md bg-blue-50/30">
+                <div className="flex justify-between items-center gap-4">
+                  <span className="text-sm text-neutral-700">{shippingLoading ? "Loading shipping options..." : shippingOption?.name || "Unavailable"}</span>
+                  <span className="text-sm font-semibold">{shippingOption ? `Rs. ${shippingCost.toLocaleString()}` : "—"}</span>
+                </div>
+                {shippingOption && <p className="mt-1 text-xs text-neutral-500">Estimated delivery: {shippingOption.minDays}–{shippingOption.maxDays} business days.</p>}
               </div>
             </div>
 
@@ -272,14 +401,55 @@ export default function CheckoutPage() {
                 <div className="flex flex-col">
                   <label className={`flex items-center space-x-3 p-4 cursor-pointer ${formData.paymentMethod === 'BANK_TRANSFER' ? 'bg-blue-50 border-b border-blue-100' : ''}`}>
                     <input type="radio" name="paymentMethod" value="BANK_TRANSFER" checked={formData.paymentMethod === 'BANK_TRANSFER'} onChange={handleChange} className="w-4 h-4 text-qala-bronze focus:ring-qala-bronze" />
-                    <span className="font-medium text-sm">Pay Online/Bank And Get Rs,100 OFF</span>
+                    <span className="font-medium text-sm">Bank Transfer (prepaid) — get Rs. 100 off</span>
                   </label>
                   {formData.paymentMethod === 'BANK_TRANSFER' && (
                     <div className="bg-neutral-50 p-5 text-sm text-neutral-700 leading-relaxed border-t border-neutral-200">
-                      Bank: Alfalah Bank<br />
-                      Account Title: Real Beauty<br />
-                      Account Number: 05921010147579<br />
-                      Share Screenshot Back of Payment on this number: 03402222997
+                      <p className="mb-2 font-semibold text-qala-espresso">Pay by Bank Transfer</p>
+                      Bank: ******<br />
+                      Account Title: ******<br />
+                      Account Number: ******<br />
+                      <span className="mt-1 flex flex-wrap items-center gap-2">
+                        <span>Share Screenshot Back of Payment on this number:</span>
+                        <button
+                          type="button"
+                          onClick={handleCopyBankNumber}
+                          className="font-semibold text-qala-espresso underline decoration-qala-bronze underline-offset-2 transition-colors hover:text-qala-bronze"
+                          aria-label="Copy payment contact number"
+                        >
+                          03322363113
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCopyBankNumber}
+                          className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                            isBankNumberCopied
+                              ? "border-green-600 bg-green-600 text-white"
+                              : "border-qala-bronze text-qala-espresso hover:bg-qala-champagne"
+                          }`}
+                          aria-label={isBankNumberCopied ? "Number copied" : "Copy payment contact number"}
+                        >
+                          {isBankNumberCopied ? (
+                            "Copied ✓"
+                          ) : (
+                            <>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              >
+                                <rect width="13" height="13" x="9" y="9" rx="2" />
+                                <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                              </svg>
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </span>
                     </div>
                   )}
                 </div>
@@ -308,8 +478,8 @@ export default function CheckoutPage() {
                         </select>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input type="text" placeholder="First name (optional)" className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
-                        <input type="text" placeholder="Last name" className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
+                        <input type="text" placeholder="First name (optional)" name="billingAddress.firstName" value={formData.billingAddress.firstName} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
+                        <input type="text" placeholder="Last name" name="billingAddress.lastName" value={formData.billingAddress.lastName} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
                       </div>
                       <div>
                         <input type="text" placeholder="Address" name="billingAddress.address" required value={formData.billingAddress.address} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
@@ -322,7 +492,7 @@ export default function CheckoutPage() {
                         <input type="text" placeholder="Postal code (optional)" name="billingAddress.postalCode" value={formData.billingAddress.postalCode} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
                       </div>
                       <div>
-                        <input type="text" placeholder="Phone (optional)" className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
+                        <input type="text" placeholder="Phone (optional)" name="billingAddress.phone" value={formData.billingAddress.phone} onChange={handleChange} className="w-full px-4 py-3 border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-qala-bronze focus:border-qala-bronze" />
                       </div>
                     </div>
                   )}
@@ -378,6 +548,15 @@ export default function CheckoutPage() {
                         <p className="text-neutral-500 text-xs mt-0.5">{item.color} / {item.size}</p>
                         <p className="font-medium text-neutral-900 mt-1">Rs. {(calculateItemPrice(item) * item.quantity).toLocaleString()}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => dispatch(removeFromCart(item.cartItemId))}
+                        aria-label={`Remove ${item.name} from order summary`}
+                        title="Remove item"
+                        className="self-start text-red-600 transition hover:text-red-800"
+                      >
+                        <DeleteIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -400,6 +579,15 @@ export default function CheckoutPage() {
                         <p className="text-neutral-500 text-xs mt-0.5">{items[0].color} / {items[0].size}</p>
                         <p className="font-medium text-neutral-900 mt-1">Rs. {(calculateItemPrice(items[0]) * items[0].quantity).toLocaleString()}</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => dispatch(removeFromCart(items[0].cartItemId))}
+                        aria-label={`Remove ${items[0].name} from order summary`}
+                        title="Remove item"
+                        className="self-start text-red-600 transition hover:text-red-800"
+                      >
+                        <DeleteIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   )}
                   {items.length > 1 && (
@@ -489,6 +677,19 @@ export default function CheckoutPage() {
               />
             </div>
 
+            <p className="text-sm text-neutral-600">
+              Estimated delivery: <strong className="text-qala-espresso">2–5 business days</strong> after order confirmation. Custom or made-to-order items may require additional processing time.
+            </p>
+
+            <label className="flex items-start gap-3 text-sm text-neutral-700">
+              <input type="checkbox" name="termsAccepted" checked={formData.termsAccepted} onChange={handleChange} className="mt-1 h-4 w-4 rounded border-neutral-300 accent-qala-espresso" />
+              <span>I agree to the <Link to="/terms-and-conditions" className="font-semibold text-qala-bronze hover:underline">Terms & Conditions</Link>.</span>
+            </label>
+
+            <p className="text-xs leading-relaxed text-neutral-500">
+              Please review our <Link to="/shipping-policy" className="text-qala-bronze hover:underline">Shipping Policy</Link>, <Link to="/refund-policy" className="text-qala-bronze hover:underline">Returns & Refunds</Link>, and <Link to="/privacy-policy" className="text-qala-bronze hover:underline">Privacy Policy</Link> before completing your order.
+            </p>
+
             <button type="submit" disabled={submitting} className="w-full bg-qala-espresso text-white py-4 rounded-md hover:bg-[#126298] transition font-bold text-lg disabled:opacity-50">
               {submitting ? "Processing Order..." : "Complete order"}
             </button>
@@ -514,6 +715,15 @@ export default function CheckoutPage() {
                   <p className="text-neutral-500 text-xs">{item.color} / {item.size}</p>
                   <p className="font-medium mt-1">Rs. {(calculateItemPrice(item) * item.quantity).toLocaleString()}</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => dispatch(removeFromCart(item.cartItemId))}
+                  aria-label={`Remove ${item.name} from order summary`}
+                  title="Remove item"
+                  className="self-start text-red-600 transition hover:text-red-800"
+                >
+                  <DeleteIcon className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>

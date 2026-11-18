@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { ApiError } from "../utils/ApiError.js";
 import { ipKeyGenerator } from "express-rate-limit";
 
-const GLOBAL_LIMIT = 200;
+const GLOBAL_LIMIT = 400;
 const ADMIN_LIMIT = 10000; //was 2000
 const WINDOW_MS = 15 * 60 * 1000;
 
@@ -62,10 +62,44 @@ export const globalLimiter = rateLimit({
 export const authLimiter = rateLimit({
     windowMs: WINDOW_MS,
     max: 6,
+    skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res, next) => {
         next(new ApiError(429, "Too many authentication attempts, please try again later"));
+    },
+});
+
+// Refresh is intentionally separate from login attempts because normal
+// session renewal can happen more frequently while several tabs are open.
+export const refreshLimiter = rateLimit({
+    windowMs: WINDOW_MS,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res, next) => {
+        next(new ApiError(429, "Too many session refresh attempts, please try again later"));
+    },
+});
+
+export const googleAuthLimiter = rateLimit({
+    windowMs: WINDOW_MS,
+    max: 30,
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res, next) => {
+        next(new ApiError(429, "Too many Google authentication attempts, please try again later"));
+    },
+});
+
+export const verificationLimiter = rateLimit({
+    windowMs: WINDOW_MS,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res, next) => {
+        next(new ApiError(429, "Too many verification attempts, please try again later"));
     },
 });
 

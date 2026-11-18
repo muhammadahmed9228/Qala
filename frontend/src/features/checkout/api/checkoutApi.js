@@ -4,6 +4,8 @@ export const createOrderApi = (orderData) => {
   return apiClient.post("/orders", orderData);
 };
 
+export const getShippingOptionsApi = () => apiClient.get("/orders/shipping-options");
+
 export const validateCouponApi = (code, subtotal) => {
   return apiClient.post("/coupons/apply", { code, subtotal });
 };

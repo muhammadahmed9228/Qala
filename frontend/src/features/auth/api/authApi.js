@@ -7,3 +7,5 @@ export const logoutApi = () => apiClient.post("/auth/logout");
 export const getMeApi = () => apiClient.get("/auth/me");
 export const updateProfileApi = (data) => apiClient.patch("/auth/update-profile", data);
 export const changePasswordApi = (data) => apiClient.post("/auth/change-password", data);
+export const verifyEmailApi = (token) => apiClient.get(`/auth/verify-email/${token}`);
+export const resendVerificationApi = (email) => apiClient.post("/auth/resend-verification", { email });

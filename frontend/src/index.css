@@ -47,3 +47,81 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Qala notification treatment */
+.qala-toast {
+  --toastify-color-light: #9b7b55;
+  --toastify-text-color-light: #ffffff;
+  min-height: 3.5rem;
+  border: 1px solid rgba(216, 200, 182, 0.7);
+  border-radius: 0.5rem;
+  background: #9b7b55 !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 28px rgba(48, 37, 30, 0.2);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.qala-toast .Toastify__toast-body {
+  padding: 0.35rem 0;
+}
+
+.qala-toast .Toastify__close-button {
+  color: #ffffff;
+  opacity: 0.8;
+}
+
+.qala-toast .Toastify__close-button:hover {
+  opacity: 1;
+}
+
+.qala-toast.Toastify__toast--success {
+  border-left: 4px solid #16a34a;
+}
+
+.qala-toast.Toastify__toast--error {
+  border-left: 4px solid #dc2626;
+}
+
+.qala-toast.Toastify__toast--warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.qala-toast.Toastify__toast--info {
+  border-left: 4px solid #2563eb;
+}
+
+.qala-toast .Toastify__progress-bar--success {
+  background: #16a34a;
+}
+
+.qala-toast .Toastify__progress-bar--error {
+  background: #dc2626;
+}
+
+.qala-toast .Toastify__progress-bar--warning {
+  background: #f59e0b;
+}
+
+.qala-toast .Toastify__progress-bar--info {
+  background: #2563eb;
+}
+
+@keyframes qalaToastIn {
+  from { opacity: 0; transform: translate3d(110%, 0, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes qalaToastOut {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(110%, 0, 0) scale(0.96); }
+}
+
+.Toastify__toast-container .qala-toast {
+  animation: qalaToastIn 0.3s ease-out both;
+}
+
+.Toastify__toast-container .qala-toast.Toastify__bounce-exit--bottom-right {
+  animation: qalaToastOut 0.24s ease-in both;
+}

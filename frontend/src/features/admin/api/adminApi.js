@@ -7,11 +7,11 @@ export const getDashboardStatsApi = () => {
 // Admin List APIs
 export const getAdminProductsApi = (params) => apiClient.get("/products", { params });
 export const getAdminOrdersApi = (params) => apiClient.get("/orders", { params });
-export const getAdminCustomersApi = () => apiClient.get("/customers");
+export const getAdminCustomersApi = (params) => apiClient.get("/customers", { params });
 
 // Admin Action APIs
 export const updateOrderStatusApi = (id, status) => apiClient.patch(`/orders/${id}/status`, { status });
-
+export const updateOrderFulfillmentApi = (id, fulfillment) => apiClient.patch(`/orders/${id}/fulfillment`, fulfillment);
 export const createProductApi = (productData) => apiClient.post("/products", productData);
 export const checkProductSlugApi = (slug) => apiClient.get("/products/check-slug", { params: { slug } });
 
@@ -59,6 +59,7 @@ export const deleteCollectionApi = (id) => apiClient.delete(`/collections/${id}`
 export const deleteOrderApi = (id) => apiClient.delete(`/orders/${id}`);
 
 export const getPublicHomeSectionsApi = (params) => apiClient.get("/home-sections", {params}); // <--- Restored this line!
+export const getPublicHomeSectionsWithProductsApi = () => apiClient.get("/home-sections/with-products");
 // Home Sections APIs (Dynamic Homepage)
 export const getAdminHomeSectionsApi = (params) => apiClient.get("/home-sections", {params});
 export const createHomeSectionApi = (data) => apiClient.post("/home-sections", data);

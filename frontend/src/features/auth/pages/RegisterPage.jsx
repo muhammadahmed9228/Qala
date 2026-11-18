@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { registerApi } from "../api/authApi";
 import { Turnstile } from '@marsidev/react-turnstile';
 import PasswordInput from "../../../components/PasswordInput";
+import SEO from "../../../components/SEO";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({ name: "", email: "", password: "", phone: "" });
@@ -25,8 +26,8 @@ export default function RegisterPage() {
     
     setSubmitting(true);
     try {
-      await registerApi({ ...formData, turnstileToken });
-      toast.success("Account created successfully! Please log in.");
+      const response = await registerApi({ ...formData, turnstileToken });
+      toast.success(response.message || "Account created. Please verify your email.");
       navigate("/login");
     } catch (error) {
       toast.error(error.message || "Registration failed");
@@ -37,6 +38,7 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-md mx-auto my-12 bg-white p-8 rounded-lg shadow-sm border border-neutral-200">
+      <SEO title="Create Account | Qala" description="Create your Qala account for a smoother shopping experience." noindex />
       <h2 className="text-2xl font-serif font-bold text-center mb-6">Create Account</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -76,6 +78,7 @@ export default function RegisterPage() {
           <PasswordInput
             name="password"
             required
+            minLength={8}
             placeholder="Enter password"
             autoComplete="new-password"
             value={formData.password}

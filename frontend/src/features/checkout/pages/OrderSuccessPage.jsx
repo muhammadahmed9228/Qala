@@ -1,4 +1,5 @@
 import { useLocation, Link, Navigate } from "react-router-dom";
+import SEO from "../../../components/SEO";
 
 export default function OrderSuccessPage() {
   const location = useLocation();
@@ -10,6 +11,7 @@ export default function OrderSuccessPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-20 text-center space-y-6">
+      <SEO title="Order Confirmed | Qala" description="Your Qala order has been placed successfully." noindex />
       <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
         <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>

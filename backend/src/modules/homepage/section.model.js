@@ -13,4 +13,6 @@ const sectionSchema = new Schema({
     enabled: { type: Boolean, default: true }
 }, { timestamps: true });
 
+sectionSchema.index({ enabled: 1, displayOrder: 1, createdAt: -1 });
+
 export const HomeSection = mongoose.model("HomeSection", sectionSchema);

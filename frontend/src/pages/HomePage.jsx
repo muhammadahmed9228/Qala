@@ -1,11 +1,12 @@
 import { Fragment, useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getPublicHeroSlidesApi } from "../features/homepage/api/homeApi";
-import { getPublicHomeSectionsApi } from "../features/admin/api/adminApi";
-import { getProductsApi, getPublicCollectionsApi } from "../features/products/api/productsApi";
+import { getPublicHomeSectionsWithProductsApi } from "../features/admin/api/adminApi";
+import { getPublicCollectionsApi } from "../features/products/api/productsApi";
 import HeroCarousel from "../features/homepage/components/HeroCarousel";
 import ProductCarousel from "../features/products/components/ProductCarousel";
 import HomePageSkeleton from "../components/HomePageSkeleton";
+import SEO from "../components/SEO";
 
 export default function HomePage() {
   const [slides, setSlides] = useState([]);
@@ -14,7 +15,6 @@ export default function HomePage() {
   const [collectionPosition, setCollectionPosition] = useState(0);
   const [visibleCollectionCount, setVisibleCollectionCount] = useState(3);
   const [loading, setLoading] = useState(true);
-  const [showScrollTop, setShowScrollTop] = useState(false);
   const collectionTouchStartX = useRef(null);
 
   useEffect(() => {
@@ -24,33 +24,17 @@ export default function HomePage() {
         const [slidesRes, collectionsRes, sectionsRes] = await Promise.all([
           getPublicHeroSlidesApi({ limit: 10 }),
           getPublicCollectionsApi({ limit: 10 }),
-          getPublicHomeSectionsApi({ limit: 10 }),
+          getPublicHomeSectionsWithProductsApi(),
         ]);
 
         setSlides(slidesRes.data.slides || slidesRes.data);
         setCollections(collectionsRes.data.collections || collectionsRes.data);
 
-        // 2. Fetch products for EACH dynamic section dynamically!
+        // Products for dynamic sections are returned by the same backend
+        // request, avoiding one API/database query per section.
         const sectionsData = sectionsRes.data.sections || sectionsRes.data;
-        const populatedSections = await Promise.all(
-          sectionsData.map(async (sec) => {
-            let params = { limit: 12 }; // Fetch 12 items to allow carousel navigation
-
-            // Map the section criteria to our robust product sorting API
-            if (sec.criteria === "newest") params.sort = "createdAt";
-            if (sec.criteria === "bestselling") params.sort = "bestselling";
-            if (sec.criteria === "featured") params.sort = "featured";
-            if (sec.criteria === "collection" && sec.collectionRef)
-              params.collection =
-                sec.collectionRef._id || sec.collectionRef;
-
-            const pRes = await getProductsApi(params);
-            return { ...sec, products: pRes.data.products || pRes.data };
-          }),
-        );
-
-        setDynamicSections(populatedSections);
-      } catch (error) {
+        setDynamicSections(sectionsData);
+      } catch {
         console.error("Failed to load homepage data");
       } finally {
         setLoading(false);
@@ -68,16 +52,10 @@ export default function HomePage() {
       );
     };
 
-    const handleScrollTop = () => {
-      setShowScrollTop(window.scrollY > 300);
-    };
-
     updateCollectionLayout();
     window.addEventListener("resize", updateCollectionLayout);
-    window.addEventListener("scroll", handleScrollTop, { passive: true });
     return () => {
       window.removeEventListener("resize", updateCollectionLayout);
-      window.removeEventListener("scroll", handleScrollTop);
     };
   }, [collections.length]);
 
@@ -215,6 +193,11 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6 pb-12 md:space-y-10 md:pb-16">
+      <SEO
+        title="Qala | Timeless Eastern Wear"
+        description="Shop Qala's refined Eastern wear and thoughtfully crafted silhouettes for effortless, modern elegance."
+        canonicalPath="/"
+      />
       <div>
         <HeroCarousel slides={slides} />
       </div>
@@ -266,32 +249,6 @@ export default function HomePage() {
 
       {dynamicSections.length === 0 && collectionSection}
 
-      {/* Scroll to Top Button (Placed above WhatsApp icon with smooth fade) */}
-      <button
-        type="button"
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className={`fixed bottom-24 right-7 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-qala-espresso text-white shadow-lg transition-all duration-300 hover:scale-110 hover:bg-qala-bronze ${
-          showScrollTop
-            ? "opacity-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 translate-y-4 pointer-events-none"
-        }`}
-        aria-label="Scroll to top"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 15l7-7 7 7"
-          />
-        </svg>
-      </button>
     </div>
   );
 }

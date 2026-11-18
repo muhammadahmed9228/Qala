@@ -2,6 +2,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
 import { closeCart, removeFromCart, updateQuantity } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
+import DeleteIcon from "../../../components/DeleteIcon";
 
 export default function CartModal() {
   const { items, isCartOpen } = useSelector((state) => state.cart);
@@ -134,14 +135,17 @@ export default function CartModal() {
                     </div>
                     {item.stock > 0 && item.quantity >= item.stock && (
                       <span className="text-xs text-qala-bronze">
-                        Maximum available: {item.stock}
+                        Availability: {item.stock}
                       </span>
                     )}
                     <button
                       onClick={() => dispatch(removeFromCart(item.cartItemId))}
-                      className="text-xs text-qala-bronze hover:underline"
+                      type="button"
+                      aria-label={`Remove ${item.name} from cart`}
+                      title="Remove item"
+                      className="text-red-600 transition hover:text-red-800"
                     >
-                      Remove
+                      <DeleteIcon className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

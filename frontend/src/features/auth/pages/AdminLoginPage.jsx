@@ -6,6 +6,7 @@ import { loginApi, logoutApi } from "../api/authApi";
 import { setCredentials } from "../authSlice";
 import { Turnstile } from '@marsidev/react-turnstile';
 import PasswordInput from "../../../components/PasswordInput";
+import SEO from "../../../components/SEO";
 
 export default function AdminLoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -58,6 +59,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-qala-cream px-4 py-10">
+      <SEO title="Admin Login | Qala" description="Secure Qala administration login." noindex />
       <div className="w-full max-w-md border border-qala-champagne bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-qala-bronze">

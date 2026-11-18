@@ -5,16 +5,23 @@ import { ApiResponse } from "../../utils/ApiResponse.js";
 import { User } from "../auth/user.model.js";
 import crypto from "crypto";
 import axios from "axios";
-import { sendPasswordResetEmail } from "../../services/email.service.js";
+import jwt from "jsonwebtoken";
+import { sendEmailVerificationEmail, sendPasswordResetEmail } from "../../services/email.service.js";
+import { createCsrfToken } from "../../middleware/csrf.middleware.js";
+import {
+    hashRefreshToken,
+    MIN_PASSWORD_LENGTH,
+    refreshTokenMatches,
+} from "./auth.security.js";
 
-// Part 1
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
         const user = await User.findById(userId);
         const accessToken = user.generateAccessToken();
         const refreshToken = user.generateRefreshToken();
 
-        user.refreshToken = refreshToken;
+        user.refreshTokenHash = hashRefreshToken(refreshToken);
+        user.refreshToken = undefined;
         await user.save({ validateBeforeSave: false });
 
         return { accessToken, refreshToken };
@@ -28,6 +35,25 @@ const cookieOptions = {
     secure: process.env.NODE_ENV === "production",
     sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
 };
+
+const csrfCookieOptions = {
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    httpOnly: false,
+};
+
+const clearAuthCookies = (res) => res
+    .clearCookie("accessToken", cookieOptions)
+    .clearCookie("refreshToken", cookieOptions);
+
+export const getCsrfToken = asyncHandler(async (req, res) => {
+    const csrfToken = createCsrfToken();
+
+    return res
+        .status(200)
+        .cookie("csrfToken", csrfToken, csrfCookieOptions)
+        .json(new ApiResponse(200, { csrfToken }, "CSRF token issued successfully"));
+});
 
 export const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password, phone, turnstileToken } = req.body;
@@ -45,40 +71,47 @@ export const registerUser = asyncHandler(async (req, res) => {
         });
 
         if (!turnstileRes.data.success) {
-            return res.status(400).json({ message: "Security verification failed. Automated request blocked." });
+            return res.status(400).json({ message: "Security verification failed. Automated request blocked. Refresh & try again." });
         }
     } catch (error) {
-        return res.status(400).json({ message: "Security verification failed. Automated request blocked." });
+        return res.status(400).json({ message: "Security verification failed. Automated request blocked. Refresh & try again." });
     }
 
-    if ([name, email, password].some((field) => field?.trim() === "")) {
+    if (!name?.trim() || !email?.trim() || !password) {
         throw new ApiError(400, "Name, email, and password are required");
     }
 
-    if (password.length < 6 || password.length > 8) {
-        throw new ApiError(400, "Password must be between 6 and 8 characters long");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        throw new ApiError(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
     }
 
-    const existedUser = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existedUser = await User.findOne({ email: normalizedEmail });
     if (existedUser) {
         throw new ApiError(409, "User with this email already exists");
     }
 
-    const user = await User.create({
+    const user = new User({
         name,
-        email,
+        email: normalizedEmail,
         password,
         phone,
+        isEmailVerified: false,
     });
+    const verificationToken = user.createEmailVerificationToken();
+    await user.save();
 
-    const createdUser = await User.findById(user._id).select("-password -refreshToken");
+    await sendEmailVerificationEmail(user.email, verificationToken);
+
+    const createdUser = await User.findById(user._id)
+        .select("-password -refreshToken -refreshTokenHash -emailVerificationToken -emailVerificationExpiry");
 
     if (!createdUser) {
         throw new ApiError(500, "Something went wrong while registering the user");
     }
 
     return res.status(201).json(
-        new ApiResponse(201, createdUser, "User registered successfully")
+        new ApiResponse(201, createdUser, "Account created. Please verify your email before signing in.")
     );
 });
 
@@ -96,31 +129,37 @@ export const loginUser = asyncHandler(async (req, res) => {
         });
 
         if (!turnstileRes.data.success) {
-            return res.status(400).json({ message: "Security verification failed." });
+            return res.status(400).json({ message: "Security verification failed. Refresh & try again." });
         }
     } catch (error) {
-        return res.status(400).json({ message: "Security verification failed." });
+        return res.status(400).json({ message: "Security verification failed. Refresh & try again." });
     }
 
-    if (!email || !password) {
+    if (!email?.trim() || !password) {
         throw new ApiError(400, "Email and password are required");
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
 
-    if (!user) {
-        throw new ApiError(404, "User does not exist");
+    if (!user || !(await user.isPasswordCorrect(password))) {
+        throw new ApiError(401, "Invalid email or password");
     }
 
-    const isPasswordValid = await user.isPasswordCorrect(password);
+    // Accounts created before verification was introduced have no flag. Treat
+    // those legacy accounts as verified so existing customers are not locked out.
+    if (user.isEmailVerified === undefined) {
+        user.isEmailVerified = true;
+        await user.save({ validateBeforeSave: false });
+    }
 
-    if (!isPasswordValid) {
-        throw new ApiError(401, "Invalid user credentials");
+    if (user.role === "customer" && user.isEmailVerified === false) {
+        throw new ApiError(403, "Please verify your email address before signing in");
     }
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
-    const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    const loggedInUser = await User.findById(user._id)
+        .select("-password -refreshToken -refreshTokenHash");
 
     return res
         .status(200)
@@ -129,24 +168,94 @@ export const loginUser = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                { user: loggedInUser, accessToken, refreshToken },
+                { user: loggedInUser },
                 "User logged in successfully"
             )
         );
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
-    await User.findByIdAndUpdate(
-        req.user._id,
-        { $unset: { refreshToken: 1 } },
-        { new: true }
-    );
+    let userId = req.user?._id;
+    const refreshToken = req.cookies?.refreshToken;
+
+    // Logout must still revoke the session when the short-lived access token
+    // has already expired.
+    if (!userId && refreshToken) {
+        try {
+            const decodedToken = jwt.verify(
+                refreshToken,
+                process.env.REFRESH_TOKEN_SECRET
+            );
+            userId = decodedToken?._id;
+        } catch {
+            // The cookies are cleared below even when the refresh token is
+            // missing or already invalid.
+        }
+    }
+
+    if (userId) {
+        await User.findByIdAndUpdate(
+            userId,
+            {
+                $unset: { refreshToken: 1, refreshTokenHash: 1 },
+                $inc: { tokenVersion: 1 },
+            },
+            { new: true }
+        );
+    }
 
     return res
         .status(200)
         .clearCookie("accessToken", cookieOptions)
         .clearCookie("refreshToken", cookieOptions)
         .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+export const refreshAccessToken = asyncHandler(async (req, res) => {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+        return clearAuthCookies(res)
+            .status(401)
+            .json(new ApiResponse(401, null, "Invalid or expired refresh token"));
+    }
+
+    let decodedToken;
+    try {
+        decodedToken = jwt.verify(
+            refreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        );
+    } catch {
+        return clearAuthCookies(res)
+            .status(401)
+            .json(new ApiResponse(401, null, "Invalid or expired refresh token"));
+    }
+
+    const user = await User.findById(decodedToken?._id);
+    if (!user || !refreshTokenMatches(refreshToken, user)) {
+        return clearAuthCookies(res)
+            .status(401)
+            .json(new ApiResponse(401, null, "Invalid or expired refresh token"));
+    }
+
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+        await generateAccessAndRefreshTokens(user._id);
+
+    const loggedInUser = await User.findById(user._id)
+        .select("-password -refreshToken -refreshTokenHash");
+
+    return res
+        .status(200)
+        .cookie("accessToken", newAccessToken, cookieOptions)
+        .cookie("refreshToken", newRefreshToken, cookieOptions)
+        .json(
+            new ApiResponse(
+                200,
+                { user: loggedInUser },
+                "Session refreshed successfully"
+            )
+        );
 });
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
@@ -163,8 +272,8 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
         throw new ApiError(400, "New password is required");
     }
 
-    if (newPassword.length < 6 || newPassword.length > 8) {
-        throw new ApiError(400, "New password must be between 6 and 8 characters long");
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new ApiError(400, `New password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
     }
 
     const user = await User.findById(req.user?._id);
@@ -184,6 +293,9 @@ export const changeCurrentPassword = asyncHandler(async (req, res) => {
     }
 
     user.password = newPassword;
+    user.refreshToken = undefined;
+    user.refreshTokenHash = undefined;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save({ validateBeforeSave: false }); // Pre-save hook will hash it
 
     return res
@@ -207,7 +319,7 @@ export const updateAccountDetails = asyncHandler(async (req, res) => {
             },
         },
         { new: true, runValidators: true }
-    ).select("-password -refreshToken");
+    ).select("-password -refreshToken -refreshTokenHash");
 
     return res
         .status(200)
@@ -227,7 +339,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     if (!user) {
         return res
             .status(200)
-            .json(new ApiResponse(200, null, "If an account exists, a reset token will be issued."));
+            .json(new ApiResponse(200, null, "If an account exists, a password reset email has been sent."));
     }
 
     const resetToken = user.createPasswordResetToken();
@@ -241,6 +353,46 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     );
 });
 
+export const verifyEmail = asyncHandler(async (req, res) => {
+    const hashedToken = crypto
+        .createHash("sha256")
+        .update(req.params.token)
+        .digest("hex");
+
+    const user = await User.findOne({
+        emailVerificationToken: hashedToken,
+        emailVerificationExpiry: { $gt: Date.now() },
+    });
+
+    if (!user) {
+        throw new ApiError(400, "Email verification link is invalid or has expired");
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpiry = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json(new ApiResponse(200, null, "Email verified successfully"));
+});
+
+export const resendVerificationEmail = asyncHandler(async (req, res) => {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+
+    if (!normalizedEmail) {
+        throw new ApiError(400, "Email is required");
+    }
+
+    const user = await User.findOne({ email: normalizedEmail, role: "customer" });
+    if (user && user.isEmailVerified === false) {
+        const verificationToken = user.createEmailVerificationToken();
+        await user.save({ validateBeforeSave: false });
+        await sendEmailVerificationEmail(user.email, verificationToken);
+    }
+
+    return res.status(200).json(new ApiResponse(200, null, "If the account requires verification, a new email has been sent."));
+});
+
 export const resetPassword = asyncHandler(async (req, res) => {
     const { resetToken } = req.params;
     const { newPassword } = req.body;
@@ -249,8 +401,8 @@ export const resetPassword = asyncHandler(async (req, res) => {
         throw new ApiError(400, "New password is required");
     }
 
-    if (newPassword.length < 6 || newPassword.length > 8) {
-        throw new ApiError(400, "New password must be between 6 and 8 characters long");
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new ApiError(400, `New password must be at least ${MIN_PASSWORD_LENGTH} characters long`);
     }
 
     // Hash the token from params to compare with the one in DB
@@ -271,6 +423,9 @@ export const resetPassword = asyncHandler(async (req, res) => {
     user.password = newPassword;
     user.forgotPasswordToken = undefined;
     user.forgotPasswordExpiry = undefined;
+    user.refreshToken = undefined;
+    user.refreshTokenHash = undefined;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
 
     await user.save({ validateBeforeSave: false });
 
@@ -316,13 +471,19 @@ export const googleLogin = asyncHandler(async (req, res) => {
             // If they signed up manually before, link their Google account now
             user.googleId = googleId;
             if (!user.avatar) user.avatar = picture;
+            user.isEmailVerified = true;
             await user.save();
+        } else if (user.isEmailVerified === false) {
+            // Google has already verified ownership of this email address.
+            user.isEmailVerified = true;
+            await user.save({ validateBeforeSave: false });
         }
 
         const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
         // Remove sensitive info before sending response
-        const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+        const loggedInUser = await User.findById(user._id)
+            .select("-password -refreshToken -refreshTokenHash");
 
         return res
             .status(200)
@@ -331,7 +492,7 @@ export const googleLogin = asyncHandler(async (req, res) => {
             .json(
                 new ApiResponse(
                     200,
-                    { user: loggedInUser, accessToken, refreshToken },
+                    { user: loggedInUser },
                     "Google Login Successful"
                 )
             );

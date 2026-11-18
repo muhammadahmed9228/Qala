@@ -34,7 +34,21 @@ const orderSchema = new Schema(
             address: { type: String, required: true },
             city: { type: String, required: true },
             postalCode: { type: String, default: "" },
+            country: { type: String, default: "Pakistan" },
             notes: { type: String }
+        },
+        billingInfo: {
+            address: { type: String, default: "" },
+            city: { type: String, default: "" },
+            postalCode: { type: String, default: "" },
+            country: { type: String, default: "Pakistan" },
+            phone: { type: String, default: "" }
+        },
+        shippingMethod: {
+            code: { type: String, default: "flat_rate" },
+            name: { type: String, default: "Standard Delivery" },
+            minDays: { type: Number, default: 2 },
+            maxDays: { type: Number, default: 5 }
         },
         items: [orderItemSchema],
         pricing: {
@@ -49,9 +63,34 @@ const orderSchema = new Schema(
             discountValue: { type: Number },
             discountAmount: { type: Number }
         },
-        paymentMethod: { type: String, enum: ["COD", "BANK_TRANSFER"], default: "COD" }
+        paymentMethod: { type: String, enum: ["COD", "BANK_TRANSFER"], default: "COD" },
+        fulfillment: {
+            courier: { type: String, default: "" },
+            trackingNumber: { type: String, default: "" },
+            internalNotes: { type: String, default: "" },
+            shippedAt: { type: Date, default: null },
+            deliveredAt: { type: Date, default: null }
+        },
+        inventoryRestoredAt: { type: Date, default: null },
+        idempotencyKey: { type: String, unique: true, sparse: true, index: true },
+        termsAccepted: { type: Boolean, default: false },
+        termsAcceptedAt: { type: Date, default: null }
     },
     { timestamps: true }
+);
+
+// A customer may use a coupon code only once while an order is active. The
+// partial index excludes cancelled orders so the code can be used again after
+// cancellation, while the unique constraint closes concurrent checkout races.
+orderSchema.index(
+    { "customerInfo.email": 1, "coupon.code": 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            "coupon.code": { $type: "string" },
+            status: { $in: ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"] }
+        }
+    }
 );
 
 export const Order = mongoose.model("Order", orderSchema);

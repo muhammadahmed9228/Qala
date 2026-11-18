@@ -6,6 +6,7 @@ import helmet from "helmet";
 import mongoSanitize from "express-mongo-sanitize"; 
 import { globalLimiter } from "./middleware/rateLimiter.middleware.js"; 
 import { errorHandler } from "./middleware/error.middleware.js";
+import { verifyCsrfToken } from "./middleware/csrf.middleware.js";
 import { ApiResponse } from "./utils/ApiResponse.js";
 
 const app = express();
@@ -21,6 +22,9 @@ app.get("/health", (req, res) => {
 
 // Middleware
 app.use(helmet());
+// SEO files must remain reachable by crawlers and static hosting checks that
+// do not send a browser Origin header.
+app.use("/", seoRouter);
 // Parse environment origins and trim any accidental whitespaces
 const allowedOrigins = process.env.CORS_ORIGIN 
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim()) 
@@ -46,6 +50,9 @@ app.use(cors({
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(cookieParser());
+// All state-changing API requests must include the CSRF token paired with
+// the cookie issued by /auth/csrf-token.
+app.use(`/api/v1`, verifyCsrfToken);
 
 // FIX: Make req.query writable for Express 5 so mongo-sanitize doesn't crash
 app.use((req, res, next) => {
@@ -83,6 +90,7 @@ import homeRouter from "./modules/homepage/hero.routes.js";
 import sectionRouter from "./modules/homepage/section.routes.js";
 import announcementRouter from "./modules/announcements/announcement.routes.js";
 import couponRouter from "./modules/coupons/coupon.routes.js";
+import seoRouter from "./modules/seo/seo.routes.js";
 
 // Routes Declaration
 app.use(`${API_PREFIX}/auth`, authRouter);

@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
+import DraggableFloatingButton from "./DraggableFloatingButton";
 
 const inMemoryScrollPositions = new Map();
 
@@ -48,14 +49,23 @@ export default function ScrollToTop() {
   const navType = useNavigationType();
   const currentKeyRef = useRef(getScrollKey(location));
   const isProgrammaticScrollRef = useRef(false);
-
-  currentKeyRef.current = getScrollKey(location);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Disable native browser scroll restoration immediately
   useEffect(() => {
     if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
       window.history.scrollRestoration = "manual";
     }
+  }, []);
+
+  useEffect(() => {
+    const handleScrollButtonVisibility = () => {
+      setShowScrollButton(window.scrollY > 280);
+    };
+
+    handleScrollButtonVisibility();
+    window.addEventListener("scroll", handleScrollButtonVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", handleScrollButtonVisibility);
   }, []);
 
   // Save scroll position on user scrolling
@@ -83,6 +93,7 @@ export default function ScrollToTop() {
   // Handle route change
   useLayoutEffect(() => {
     const currentKey = getScrollKey(location);
+    currentKeyRef.current = currentKey;
     isProgrammaticScrollRef.current = true;
 
     if (navType === "PUSH" || navType === "REPLACE") {
@@ -170,7 +181,32 @@ export default function ScrollToTop() {
 
     forceScrollTo(0);
     isProgrammaticScrollRef.current = false;
-  }, [location.pathname, location.search, navType]);
+  }, [location, navType]);
 
-  return null;
+  const handleScrollToTop = () => {
+    savePosition(currentKeyRef.current, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  return showScrollButton ? (
+    <DraggableFloatingButton
+      type="button"
+      onClick={handleScrollToTop}
+      aria-label="Scroll to top"
+      title="Scroll to top"
+      className="fixed bottom-24 right-6 z-[9998] flex h-12 w-12 items-center justify-center rounded-full border border-qala-bronze/60 bg-transparent text-qala-bronze shadow-sm transition hover:border-qala-bronze hover:text-qala-espresso hover:shadow-md"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="h-6 w-6"
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 7-7 7 7M12 19V6" />
+      </svg>
+    </DraggableFloatingButton>
+  ) : null;
 }

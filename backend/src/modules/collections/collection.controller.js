@@ -2,6 +2,9 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { Collection } from "./collection.model.js";
+import { getPagination } from "../../utils/pagination.js";
+import { deleteImageKitFile } from "../../services/imagekit.service.js";
+import { pickAllowedFields } from "../../utils/pickAllowedFields.js";
 
 export const createCollection = asyncHandler(async (req, res) => {
     const { name, slug, description, image, enabled, displayOrder } = req.body;
@@ -17,7 +20,8 @@ export const createCollection = asyncHandler(async (req, res) => {
 });
 
 export const getCollections = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, sort = "order_asc", status } = req.query;
+    const { sort = "order_asc", status } = req.query;
+    const { page, limit, skip } = getPagination(req.query);
     const isAdmin = req.user && req.user.role === "admin";
     
     const filter = isAdmin ? {} : { enabled: true };
@@ -27,8 +31,6 @@ export const getCollections = asyncHandler(async (req, res) => {
         if (status === "active") filter.enabled = true;
         if (status === "inactive") filter.enabled = false;
     }
-
-    const skip = (Number(page) - 1) * Number(limit);
 
     let sortOptions = { displayOrder: 1, createdAt: -1 };
     if (sort === "order_desc") sortOptions = { displayOrder: -1, createdAt: -1 };
@@ -40,22 +42,31 @@ export const getCollections = asyncHandler(async (req, res) => {
     const collections = await Collection.find(filter)
         .sort(sortOptions)
         .skip(skip)
-        .limit(Number(limit));
+        .limit(limit);
 
     const total = await Collection.countDocuments(filter);
 
     return res.status(200).json(new ApiResponse(200, {
         collections, 
         total,
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit))
+        page,
+        pages: Math.ceil(total / limit)
     }, "Collections fetched successfully"));
 });
 
 export const updateCollection = asyncHandler(async (req, res) => {
+    const updates = pickAllowedFields(req.body, [
+        "name",
+        "slug",
+        "description",
+        "image",
+        "enabled",
+        "displayOrder"
+    ]);
+
     const collection = await Collection.findByIdAndUpdate(
         req.params.id,
-        { $set: req.body },
+        { $set: updates },
         { new: true, runValidators: true }
     );
 
@@ -64,8 +75,17 @@ export const updateCollection = asyncHandler(async (req, res) => {
 });
 
 export const deleteCollection = asyncHandler(async (req, res) => {
-    const collection = await Collection.findByIdAndDelete(req.params.id);
+    const collection = await Collection.findById(req.params.id);
     if (!collection) throw new ApiError(404, "Collection not found");
+
+    try {
+        await deleteImageKitFile(collection.image?.fileId);
+    } catch (error) {
+        console.error("Collection image cleanup failed:", error);
+        throw new ApiError(502, "Collection image cleanup failed. Please try again.");
+    }
+
+    await Collection.findByIdAndDelete(collection._id);
     
     // Note: If you want to prevent deletion when products are linked, 
     // you would query the Product model here and throw an error if count > 0.

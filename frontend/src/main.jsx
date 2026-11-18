@@ -6,6 +6,7 @@ import App from "./App";
 import "./index.css";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import AppErrorBoundary from "./components/AppErrorBoundary";
+import { HelmetProvider } from "react-helmet-async";
 
 // Disable browser native scroll restoration immediately so it does not interfere with async page loads
 if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
@@ -18,9 +19,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <Provider store={store}>
       <GoogleOAuthProvider clientId={clientId}>
-        <AppErrorBoundary>
-          <App />
-        </AppErrorBoundary>
+        <HelmetProvider>
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>
+        </HelmetProvider>
       </GoogleOAuthProvider>
     </Provider>
   </React.StrictMode>,

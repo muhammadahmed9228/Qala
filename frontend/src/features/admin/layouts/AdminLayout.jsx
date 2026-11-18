@@ -6,6 +6,7 @@ import SearchBar from "../../../components/SearchBar";
 import { logoutApi } from "../../auth/api/authApi";
 import { logoutSuccess } from "../../auth/authSlice";
 import logoImg from "../../../assets/logo.jpeg";
+import SEO from "../../../components/SEO";
 
 export default function AdminLayout() {
   const { user } = useSelector((state) => state.auth);
@@ -41,6 +42,7 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-qala-cream md:flex-row">
+      <SEO title="Admin Control | Qala" description="Qala administration panel." noindex />
       {/* Sidebar */}
       {isMobileMenuOpen && (
         <button

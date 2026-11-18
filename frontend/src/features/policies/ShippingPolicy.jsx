@@ -1,9 +1,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import SEO from "../../components/SEO";
 
 export default function ShippingPolicy() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 md:py-16">
+      <SEO title="Shipping Policy | Qala" description="Learn about Qala delivery timelines, shipping charges, and order fulfillment." canonicalPath="/shipping-policy" />
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
         <Link to="/" className="transition hover:text-qala-bronze">Home</Link>

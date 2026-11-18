@@ -3,15 +3,18 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { googleLoginApi, loginApi, logoutApi } from "../api/authApi";
+import { googleLoginApi, loginApi, logoutApi, resendVerificationApi } from "../api/authApi";
 import { setCredentials } from "../authSlice";
 import { Turnstile } from '@marsidev/react-turnstile';
 import PasswordInput from "../../../components/PasswordInput";
+import SEO from "../../../components/SEO";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [submitting, setSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,6 +44,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setShowResendVerification(false);
     if (!turnstileToken) {
       toast.error("Please complete the security check.");
       return;
@@ -59,14 +63,33 @@ export default function LoginPage() {
       toast.success("Successfully logged in!");
       navigate(returnTo, { replace: true });
     } catch (error) {
+      setShowResendVerification(error.statusCode === 403 && error.message?.toLowerCase().includes("verify"));
       toast.error(error.message || "Failed to log in");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email.trim()) {
+      toast.error("Enter your email address first.");
+      return;
+    }
+
+    setResendingVerification(true);
+    try {
+      const response = await resendVerificationApi(formData.email.trim());
+      toast.success(response.message || "If the account requires verification, a new email has been sent.");
+    } catch (error) {
+      toast.error(error.message || "Could not resend verification email");
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto my-12 bg-white p-8 rounded-lg shadow-sm border border-neutral-200">
+      <SEO title="Customer Login | Qala" description="Sign in to your Qala account and manage your orders." noindex />
       <h2 className="text-2xl font-serif font-bold text-center mb-6">
 
         Customer Login
@@ -114,6 +137,16 @@ export default function LoginPage() {
           {submitting ? "Signing In..." : "Sign In"}
         </button>
       </form>
+      {showResendVerification && (
+        <button
+          type="button"
+          onClick={handleResendVerification}
+          disabled={resendingVerification}
+          className="mt-3 w-full rounded border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+        >
+          {resendingVerification ? "Sending..." : "Resend verification email"}
+        </button>
+      )}
       <p className="mt-4 text-center text-sm text-neutral-600">
         Don't have an account?{" "}
         <Link

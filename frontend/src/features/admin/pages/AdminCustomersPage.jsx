@@ -2,25 +2,30 @@ import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { getAdminCustomersApi } from "../api/adminApi";
 import Modal from "../components/Modal";
+import ActionIcon from "../components/ActionIcon";
+import Pagination from "../components/Pagination";
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const response = await getAdminCustomersApi();
-        setCustomers(response.data);
-      } catch (error) {
+        const response = await getAdminCustomersApi({ page, limit: 10 });
+        setCustomers(response.data.customers || response.data);
+        setTotalPages(response.data.pages || 1);
+      } catch {
         toast.error("Failed to load customers");
       } finally {
         setLoading(false);
       }
     };
     fetchCustomers();
-  }, []);
+  }, [page]);
 
   if (loading)
     return <div className="py-10 text-center">Loading customers...</div>;
@@ -39,28 +44,29 @@ export default function AdminCustomersPage() {
               <th className="px-6 py-3 font-medium text-neutral-500">
                 Joined Date
               </th>
+              <th className="px-6 py-3 font-medium text-neutral-500 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-200">
             {customers.map((customer) => (
-              <tr key={customer._id} className="hover:bg-neutral-50">
+              <tr key={customer._id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer hover:bg-neutral-50">
                 <td className="px-6 py-4 font-medium">{customer.name}</td>
                 <td className="px-6 py-4">{customer.email}</td>
                 <td className="px-6 py-4">{customer.phone || "N/A"}</td>
                 <td className="px-6 py-4 text-neutral-500">
                   {new Date(customer.createdAt).toLocaleDateString()}
                 </td>
-                <button
-                  onClick={() => setSelectedCustomer(customer)}
-                  className="block text-xs text-blue-600 hover:underline mt-1"
-                >
-                  View Details
-                </button>
+                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => setSelectedCustomer(customer)} className="text-blue-600 hover:underline text-sm">
+                    <ActionIcon type="view" label="View" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <Pagination page={page} pages={totalPages} onPageChange={setPage} />
       <Modal
         isOpen={!!selectedCustomer}
         onClose={() => setSelectedCustomer(null)}

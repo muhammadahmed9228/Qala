@@ -48,3 +48,13 @@ export const getPasswordResetTemplate = (resetUrl) => `
     <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">If you did not request a password reset, please ignore this email.</p>
   </div>
 `;
+
+export const getEmailVerificationTemplate = (verificationUrl) => `
+  <div style="font-family: Arial, sans-serif; color: #333;">
+    <h2 style="color: #111;">Verify your Qala email address</h2>
+    <p>Thanks for creating your Qala account.</p>
+    <p>Please verify your email address by clicking the button below. This link will expire in 24 hours.</p>
+    <a href="${verificationUrl}" style="display: inline-block; padding: 10px 20px; background-color: #30251E; color: #fff; text-decoration: none; border-radius: 5px; margin-top: 10px;">Verify email</a>
+    <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">If you did not create this account, you can ignore this email.</p>
+  </div>
+`;

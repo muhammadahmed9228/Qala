@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getCollectionBySlugApi, getProductsApi } from "../api/productsApi";
 import ProductCard from "../components/ProductCard";
+import SEO from "../../../components/SEO";
 
 const PRODUCTS_PER_PAGE = 8;
 
@@ -76,6 +77,13 @@ export default function CollectionPage() {
 
   return (
     <div className="pb-16">
+      <SEO
+        title={`${collection.name} | Qala Collection`}
+        description={`${collection.description || `Explore ${collection.name} from Qala's refined Eastern wear collection.`} Shop timeless style at Qala.`}
+        canonicalPath={`/collections/${collection.slug}`}
+        image={collection.image?.url}
+        type="website"
+      />
       {/* Collection Hero Banner */}
       <div className="relative min-h-[16rem] py-12 md:py-0 md:h-80 bg-neutral-900 flex items-center justify-center text-center -mx-6 w-[calc(100%+3rem)] md:mx-0 md:w-full overflow-hidden">
         {collection.image?.url && (

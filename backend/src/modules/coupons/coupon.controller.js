@@ -43,6 +43,7 @@ export const updateCoupon = asyncHandler(async (req, res) => {
         discountType: req.body.discountType !== undefined ? req.body.discountType : coupon.discountType,
         discountValue: req.body.discountValue !== undefined ? req.body.discountValue : coupon.discountValue,
         minimumOrderAmount: req.body.minimumOrderAmount !== undefined ? req.body.minimumOrderAmount : coupon.minimumOrderAmount,
+        maximumOrderAmount: req.body.maximumOrderAmount !== undefined ? req.body.maximumOrderAmount : coupon.maximumOrderAmount,
         expiryDate: req.body.expiryDate !== undefined ? req.body.expiryDate : coupon.expiryDate
     };
 
@@ -89,6 +90,7 @@ export const applyCoupon = asyncHandler(async (req, res) => {
         code: coupon.code,
         discountAmount,
         discountType: coupon.discountType,
-        discountValue: coupon.discountValue
+        discountValue: coupon.discountValue,
+        maximumOrderAmount: coupon.maximumOrderAmount
     }, "Coupon applied successfully"));
 });

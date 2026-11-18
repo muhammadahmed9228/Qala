@@ -26,8 +26,7 @@ const userSchema = new Schema(
                 },
                 "Password is required"
             ],
-            minlength: [6, "Password must be at least 6 characters long"],
-            maxlength: [8, "Password must be at most 8 characters long"],
+            minlength: [8, "Password must be at least 8 characters long"],
         },
         // NEW: Google Auth Fields
         googleId: {
@@ -47,7 +46,23 @@ const userSchema = new Schema(
             enum: ["customer", "admin"],
             default: "customer",
         },
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
+        emailVerificationToken: String,
+        emailVerificationExpiry: Date,
+        tokenVersion: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         refreshToken: {
+            type: String,
+        },
+        // Store only a one-way digest of the refresh token. The legacy
+        // refreshToken field is retained temporarily for existing sessions.
+        refreshTokenHash: {
             type: String,
         },
         forgotPasswordToken: String,
@@ -75,6 +90,7 @@ userSchema.methods.generateAccessToken = function () {
             _id: this._id,
             email: this.email,
             role: this.role,
+            tokenVersion: this.tokenVersion ?? 0,
         },
         process.env.ACCESS_TOKEN_SECRET,
         {
@@ -109,6 +125,18 @@ userSchema.methods.createPasswordResetToken = function () {
     this.forgotPasswordExpiry = Date.now() + 15 * 60 * 1000;
 
     return resetToken; // Return unhashed token to send via email
+};
+
+userSchema.methods.createEmailVerificationToken = function () {
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    this.emailVerificationToken = crypto
+        .createHash("sha256")
+        .update(verificationToken)
+        .digest("hex");
+    this.emailVerificationExpiry = Date.now() + 24 * 60 * 60 * 1000;
+
+    return verificationToken;
 };
 
 export const User = mongoose.model("User", userSchema);

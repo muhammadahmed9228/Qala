@@ -2,6 +2,9 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { ApiError } from "../../utils/ApiError.js";
 import { ApiResponse } from "../../utils/ApiResponse.js";
 import { HeroSlide } from "./hero.model.js";
+import { getPagination } from "../../utils/pagination.js";
+import { deleteImageKitFile } from "../../services/imagekit.service.js";
+import { pickAllowedFields } from "../../utils/pickAllowedFields.js";
 
 export const createHeroSlide = asyncHandler(async (req, res) => {
     const { image, heading, subtitle, buttonText, buttonUrl, enabled, displayOrder } = req.body;
@@ -24,13 +27,12 @@ export const createHeroSlide = asyncHandler(async (req, res) => {
 });
 
 export const getHeroSlides = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 20, sort = "order_asc" } = req.query;
+    const { sort = "order_asc" } = req.query;
+    const { page, limit, skip } = getPagination(req.query);
     const isAdmin = req.user && req.user.role === "admin";
     
     // Public users only see enabled slides; Admins see all slides to manage them
     const filter = isAdmin ? {} : { enabled: true };
-
-    const skip = (Number(page) - 1) * Number(limit);
 
     // Advanced Sorting Logic
     let sortOptions = { displayOrder: 1, createdAt: -1 }; // Default
@@ -43,24 +45,33 @@ export const getHeroSlides = asyncHandler(async (req, res) => {
    const slides = await HeroSlide.find(filter)
         .sort(sortOptions)
         .skip(skip)
-        .limit(Number(limit));
+        .limit(limit);
         
     const total = await HeroSlide.countDocuments(filter);
 
     return res.status(200).json(new ApiResponse(200, {
         slides, 
         total,
-        page: Number(page),
-        pages: Math.ceil(total / Number(limit))
+        page,
+        pages: Math.ceil(total / limit)
     }, "Hero slides fetched successfully"));
 });
 
 export const updateHeroSlide = asyncHandler(async (req, res) => {
     const { id } = req.params;
+    const updates = pickAllowedFields(req.body, [
+        "image",
+        "heading",
+        "subtitle",
+        "buttonText",
+        "buttonUrl",
+        "enabled",
+        "displayOrder"
+    ]);
     
     const slide = await HeroSlide.findByIdAndUpdate(
         id,
-        { $set: req.body },
+        { $set: updates },
         { new: true, runValidators: true }
     );
 
@@ -70,12 +81,20 @@ export const updateHeroSlide = asyncHandler(async (req, res) => {
 });
 
 export const deleteHeroSlide = asyncHandler(async (req, res) => {
-    const slide = await HeroSlide.findByIdAndDelete(req.params.id);
+    const slide = await HeroSlide.findById(req.params.id);
     
     if (!slide) throw new ApiError(404, "Hero slide not found");
 
-    // Note: The actual ImageKit file deletion should ideally happen here using the upload.controller logic,
-    // but we will keep it simple and return the fileId so the frontend can delete it via the uploads API.
+    try {
+        // Clean up the remote asset before deleting its database reference. If
+        // ImageKit is unavailable, the slide remains retryable and consistent.
+        await deleteImageKitFile(slide.image?.fileId);
+    } catch (error) {
+        console.error("Hero slide image cleanup failed:", error);
+        throw new ApiError(502, "Hero slide image cleanup failed. Please try again.");
+    }
+
+    await HeroSlide.findByIdAndDelete(slide._id);
 
     return res.status(200).json(new ApiResponse(200, { fileId: slide.image.fileId }, "Hero slide deleted successfully"));
 });

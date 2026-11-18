@@ -2,7 +2,9 @@ import { useSelector, useDispatch } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { updateQuantity, removeFromCart, applyCoupon, removeCoupon } from "../cartSlice";
 import { calculateItemPrice } from "../cartPricing";
+import DeleteIcon from "../../../components/DeleteIcon";
 import { useState } from "react";
+import SEO from "../../../components/SEO";
 // import { toast } from "react-toastify";
 // import { validateCouponApi } from "../../checkout/api/checkoutApi";
 
@@ -68,6 +70,7 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-5xl py-5 md:py-8">
+      <SEO title="Shopping Cart | Qala" description="Review your selected Qala pieces before checkout." noindex />
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-qala-bronze">Your Qala edit</p>
       <h2 className="mb-8 text-4xl font-medium text-qala-espresso">Shopping Cart</h2>
 
@@ -94,9 +97,12 @@ export default function CartPage() {
                     </Link>
                     <button
                       onClick={() => dispatch(removeFromCart(item.cartItemId))}
-                      className="text-sm text-qala-bronze hover:underline"
+                      type="button"
+                      aria-label={`Remove ${item.name} from cart`}
+                      title="Remove item"
+                      className="text-red-600 transition hover:text-red-800"
                     >
-                      Remove
+                      <DeleteIcon />
                     </button>
                   </div>
                   <p className="text-sm text-neutral-600">
@@ -157,7 +163,7 @@ export default function CartPage() {
                   </div>
                   {item.stock > 0 && item.quantity >= item.stock && (
                     <span className="text-xs text-qala-bronze">
-                      Maximum available: {item.stock}
+                      Availability: {item.stock}
                     </span>
                   )}
                   <span className="font-semibold">
@@ -186,10 +192,13 @@ export default function CartPage() {
               <div className="flex items-center gap-2">
                 <span>Discount ({coupon.code})</span>
                 <button
+                  type="button"
                   onClick={() => dispatch(removeCoupon())}
-                  className="text-xs text-red-500 hover:underline"
+                  aria-label="Remove applied coupon"
+                  title="Remove coupon"
+                  className="text-red-600 transition hover:text-red-800"
                 >
-                  Remove
+                  <DeleteIcon className="h-4 w-4" />
                 </button>
               </div>
               <span>-Rs. {discount.toLocaleString()}</span>

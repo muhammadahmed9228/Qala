@@ -23,6 +23,7 @@ export const assertValidCouponPayload = ({
     discountType,
     discountValue,
     minimumOrderAmount = 0,
+    maximumOrderAmount = null,
     expiryDate,
     allowPastExpiry = false
 }) => {
@@ -36,6 +37,9 @@ export const assertValidCouponPayload = ({
 
     const value = Number(discountValue);
     const minimum = Number(minimumOrderAmount);
+    const maximum = maximumOrderAmount === null || maximumOrderAmount === "" || maximumOrderAmount === undefined
+        ? null
+        : Number(maximumOrderAmount);
     const expiry = (allowPastExpiry && expiryDate instanceof Date)
         ? new Date(expiryDate)
         : toEndOfDay(expiryDate);
@@ -45,6 +49,12 @@ export const assertValidCouponPayload = ({
     }
     if (!Number.isFinite(minimum) || minimum < 0) {
         throw new ApiError(400, "Invalid minimum order amount");
+    }
+    if (maximum !== null && (!Number.isFinite(maximum) || maximum < 0)) {
+        throw new ApiError(400, "Invalid maximum order amount");
+    }
+    if (maximum !== null && maximum < minimum) {
+        throw new ApiError(400, "Maximum order amount cannot be less than the minimum order amount");
     }
     if (Number.isNaN(expiry.getTime())) {
         throw new ApiError(400, "Invalid expiry date");
@@ -58,6 +68,7 @@ export const assertValidCouponPayload = ({
         discountType,
         discountValue: value,
         minimumOrderAmount: minimum,
+        maximumOrderAmount: maximum,
         expiryDate: expiry
     };
 };
@@ -82,6 +93,9 @@ export const validateCoupon = async (code, subtotal) => {
     }
     if (amount < coupon.minimumOrderAmount) {
         throw new ApiError(400, `Minimum order amount is Rs. ${coupon.minimumOrderAmount.toLocaleString()}`);
+    }
+    if (coupon.maximumOrderAmount !== null && coupon.maximumOrderAmount !== undefined && amount > coupon.maximumOrderAmount) {
+        throw new ApiError(400, `This coupon is only valid for orders up to Rs. ${coupon.maximumOrderAmount.toLocaleString()}`);
     }
 
     const rawDiscount = coupon.discountType === "percentage"

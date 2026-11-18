@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getDashboardStatsApi, getAdminOrdersApi, updateOrderStatusApi, deleteOrderApi } from "../api/adminApi";
 import Pagination from "../components/Pagination";
-import Modal from "../components/Modal"; // In case you want the view modal here too!
+import ActionIcon from "../components/ActionIcon";
 
 export default function DashboardPage() {
   // Stats State
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const [sort, setSort] = useState("newest");
   const [status, setStatus] = useState("");
   const [totalPages, setTotalPages] = useState(1);
+  const navigate = useNavigate();
 
   // Fetch Stats (Only runs once on mount)
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function DashboardPage() {
       {statsLoading ? (
         <div className="py-10 text-center text-neutral-500 animate-pulse">Loading statistics...</div>
       ) : statsData ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
           <StatCard 
             title="Total Revenue" 
             value={`Rs. ${statsData.revenue.toLocaleString()}`} 
@@ -122,7 +124,12 @@ export default function DashboardPage() {
 
       {/* Order Management Area */}
       <div className="space-y-4">
-        <h2 className="text-xl font-serif font-bold">Recent Orders</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-xl font-serif font-bold">Recent Orders</h2>
+          <button type="button" onClick={() => navigate("/admin/orders")} className="rounded bg-qala-espresso px-4 py-2 text-sm font-semibold text-white transition hover:bg-qala-bronze">
+            View All Orders
+          </button>
+        </div>
         
         {/* Sorting, Status, & Limit Controls */}
         <div className="flex flex-wrap justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-neutral-200 gap-4">
@@ -174,7 +181,8 @@ export default function DashboardPage() {
                     <th className="px-6 py-3 font-medium text-neutral-500">Customer</th>
                     <th className="px-6 py-3 font-medium text-neutral-500">Total</th>
                     <th className="px-6 py-3 font-medium text-neutral-500">Date</th>
-                    <th className="px-6 py-3 font-medium text-neutral-500">Status & Actions</th>
+                    <th className="px-6 py-3 font-medium text-neutral-500">Status</th>
+                    <th className="px-6 py-3 font-medium text-neutral-500">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
@@ -207,8 +215,8 @@ export default function DashboardPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-neutral-500">{new Date(order.createdAt).toLocaleDateString()}</td>
-                        <td className="px-6 py-4 flex flex-col gap-2 items-start">
+                        <td className="px-6 py-4 text-neutral-500">{new Date(order.createdAt).toLocaleString()}</td>
+                        <td className="px-6 py-4">
                           <select
                             value={order.status}
                             disabled={order.status === "Delivered" || order.status === "Cancelled"}
@@ -222,11 +230,10 @@ export default function DashboardPage() {
                             <option value="Delivered">Delivered</option>
                             <option value="Cancelled">Cancelled</option>
                           </select>
-                          <button 
-                            onClick={() => handleDelete(order._id)} 
-                            className="text-red-600 hover:underline text-xs"
-                          >
-                            Delete
+                        </td>
+                        <td className="px-6 py-4">
+                          <button onClick={() => handleDelete(order._id)} className="text-red-600 hover:underline text-xs">
+                            <ActionIcon type="delete" label="Delete" />
                           </button>
                         </td>
                       </tr>

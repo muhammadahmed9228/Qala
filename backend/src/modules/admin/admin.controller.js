@@ -5,41 +5,103 @@ import { User } from "../auth/user.model.js";
 import { Product } from "../products/product.model.js";
 
 export const getDashboardStats = asyncHandler(async (req, res) => {
-    // 1. Get basic counts
-    const totalCustomers = await User.countDocuments({ role: "customer" });
-    const totalProducts = await Product.countDocuments();
-    const totalOrders = await Order.countDocuments();
-
-    // 2. Order Status Breakdown
-    const pendingOrders = await Order.countDocuments({ status: "Pending" });
-    const processingOrders = await Order.countDocuments({ status: "Processing" });
-    const deliveredOrders = await Order.countDocuments({ status: "Delivered" });
-    const cancelledOrders = await Order.countDocuments({ status: "Cancelled" });
-
-    // 3. Calculate Total Revenue (only from delivered orders)
-    const revenueAggregation = await Order.aggregate([
-        { $match: { status: "Delivered" } },
-        { $group: { _id: null, totalRevenue: { $sum: "$pricing.total" } } }
+    // Keep all dashboard metrics in one database round trip. The seed documents
+    // make the lookup facet work even when there are no orders yet.
+    const [dashboardAggregation] = await Order.aggregate([
+        {
+            $unionWith: {
+                coll: User.collection.name,
+                pipeline: [
+                    { $limit: 1 },
+                    { $project: { _dashboardSeed: { $literal: true } } }
+                ]
+            }
+        },
+        {
+            $unionWith: {
+                coll: Product.collection.name,
+                pipeline: [
+                    { $limit: 1 },
+                    { $project: { _dashboardSeed: { $literal: true } } }
+                ]
+            }
+        },
+        {
+            $facet: {
+                orderStats: [
+                    { $match: { orderNumber: { $exists: true } } },
+                    {
+                        $group: {
+                            _id: null,
+                            totalOrders: { $sum: 1 },
+                            pendingOrders: { $sum: { $cond: [{ $eq: ["$status", "Pending"] }, 1, 0] } },
+                            processingOrders: { $sum: { $cond: [{ $eq: ["$status", "Processing"] }, 1, 0] } },
+                            deliveredOrders: { $sum: { $cond: [{ $eq: ["$status", "Delivered"] }, 1, 0] } },
+                            cancelledOrders: { $sum: { $cond: [{ $eq: ["$status", "Cancelled"] }, 1, 0] } },
+                            totalRevenue: {
+                                $sum: {
+                                    $cond: [
+                                        { $eq: ["$status", "Delivered"] },
+                                        { $ifNull: ["$pricing.total", 0] },
+                                        0
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ],
+                recentOrders: [
+                    { $match: { orderNumber: { $exists: true } } },
+                    { $sort: { createdAt: -1 } },
+                    { $limit: 5 },
+                    { $project: { orderNumber: 1, "customerInfo.name": 1, "pricing.total": 1, status: 1, createdAt: 1 } }
+                ],
+                entityStats: [
+                    { $match: { _dashboardSeed: true } },
+                    { $limit: 1 },
+                    {
+                        $lookup: {
+                            from: User.collection.name,
+                            pipeline: [
+                                { $match: { role: "customer" } },
+                                { $count: "count" }
+                            ],
+                            as: "customerCount"
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: Product.collection.name,
+                            pipeline: [{ $count: "count" }],
+                            as: "productCount"
+                        }
+                    },
+                    {
+                        $project: {
+                            customers: { $ifNull: [{ $arrayElemAt: ["$customerCount.count", 0] }, 0] },
+                            products: { $ifNull: [{ $arrayElemAt: ["$productCount.count", 0] }, 0] }
+                        }
+                    }
+                ]
+            }
+        }
     ]);
-    const totalRevenue = revenueAggregation.length > 0 ? revenueAggregation[0].totalRevenue : 0;
 
-    // 4. Fetch Recent Orders
-    const recentOrders = await Order.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select("orderNumber customerInfo.name pricing.total status createdAt");
+    const orderStats = dashboardAggregation?.orderStats?.[0] || {};
+    const entityStats = dashboardAggregation?.entityStats?.[0] || {};
+    const recentOrders = dashboardAggregation?.recentOrders || [];
 
     const dashboardData = {
         stats: {
-            revenue: totalRevenue,
-            customers: totalCustomers,
-            products: totalProducts,
+            revenue: orderStats.totalRevenue || 0,
+            customers: entityStats.customers || 0,
+            products: entityStats.products || 0,
             orders: {
-                total: totalOrders,
-                pending: pendingOrders,
-                processing: processingOrders,
-                delivered: deliveredOrders,
-                cancelled: cancelledOrders
+                total: orderStats.totalOrders || 0,
+                pending: orderStats.pendingOrders || 0,
+                processing: orderStats.processingOrders || 0,
+                delivered: orderStats.deliveredOrders || 0,
+                cancelled: orderStats.cancelledOrders || 0
             }
         },
         recentOrders
